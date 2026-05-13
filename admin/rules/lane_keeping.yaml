@@ -1,0 +1,30 @@
+metadata:
+  title: lane_keeping
+  severity: 4
+  fine: 350
+state_machine:
+  direction: TB
+  initial_state: centered
+  states:
+    - centered
+    - drifting
+    - lane_departure
+    - violation
+  transitions:
+    - from: "[*]"
+      to: centered
+    - from: centered
+      to: drifting
+      condition: "abs(lane_deviation) > 0.3m"
+    - from: drifting
+      to: centered
+      condition: "abs(lane_deviation) < 0.1m"
+    - from: drifting
+      to: lane_departure
+      condition: "abs(lane_deviation) > 0.7m"
+    - from: lane_departure
+      to: centered
+      condition: "indicator_on == True AND lane_change_complete"
+    - from: lane_departure
+      to: violation
+      condition: "abs(lane_deviation) > 1.2m AND indicator_on == False"

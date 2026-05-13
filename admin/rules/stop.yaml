@@ -1,0 +1,32 @@
+metadata:
+  title: Stop
+  severity: 4
+  fine: 250
+state_machine:
+  direction: TB
+  initial_state: idle
+  states:
+    - idle
+    - approaching
+    - stopped
+    - violation
+  transitions:
+    - from: "[*]"
+      to: idle
+    - from: idle
+      to: approaching
+      condition: "near_stop_sign == True AND distance_to_sign <= 20"
+    - from: approaching
+      to: stopped
+      condition: "ego_speed < 0.5"
+    - from: approaching
+      to: violation
+      conditions:
+        - "distance_to_sign <= 0"
+        - "timeout (90 frames)"
+    - from: stopped
+      to: idle
+      condition: "distance_to_sign > 20"
+    - from: violation
+      to: idle
+      condition: "distance_to_sign > 20"
