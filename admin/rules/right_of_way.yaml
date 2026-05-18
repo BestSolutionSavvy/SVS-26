@@ -1,0 +1,47 @@
+metadata:
+  title: right_of_way
+  severity: 4
+  fine: 400
+state_machine:
+  direction: TB
+  initial_state: free
+  states:
+    - free
+    - approaching
+    - yielding
+    - proceeding
+    - violation
+    - warning
+  transitions:
+    - from: "[*]"
+      to: free
+    - from: free
+      to: approaching
+      condition: "at_intersection AND has_conflict_actor"
+    - from: approaching
+      to: free
+      condition: "conflict_actor_gone OR no_intersection"
+    - from: approaching
+      to: yielding
+      condition: "has_priority == false"
+    - from: approaching
+      to: proceeding
+      condition: "has_priority == true"
+    - from: yielding
+      to: proceeding
+      condition: "intersection_clear AND ego_stopped"
+    - from: yielding
+      to: violation
+      condition: ego_enters_intersection_while_yielding
+    - from: proceeding
+      to: free
+      condition: intersection_cleared
+    - from: approaching
+      to: warning
+      condition: "ego_speed > 0 AND no_yield AND has_conflict_actor"
+    - from: warning
+      to: violation
+      condition: "ego_enters AND conflict_actor_present"
+    - from: warning
+      to: free
+      condition: "ego_stops OR ego_yields"
