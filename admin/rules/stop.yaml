@@ -21,12 +21,10 @@ state_machine:
       condition: "ego_speed < 0.5"
     - from: approaching
       to: violation
-      conditions:
-        - "distance_to_sign <= 0"
-        - "timeout (90 frames)"
+      condition: "distance_to_sign <= 0"
     - from: stopped
       to: idle
-      condition: "distance_to_sign > 20"
+      condition: "ego_speed >= 0.5"
     - from: violation
       to: idle
-      condition: "distance_to_sign > 20"
+      condition: "after(20 seconds)"
