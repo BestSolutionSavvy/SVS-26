@@ -1,0 +1,20 @@
+html, body, #q-app {
+  height: 100%;
+  overflow: hidden !important;
+  margin: 0;
+}
+
+#q-app > div {
+  height: 100%;
+  overflow: hidden !important;
+}
+
+.mermaid-preview {
+  width: 100%;
+  overflow: auto;
+}
+
+.mermaid-preview svg {
+  display: block;
+  margin: 0 auto !important;
+}

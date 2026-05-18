@@ -14,6 +14,14 @@ _TRANSITION_PATTERN = re.compile(
 
 
 def _parse_metadata_block(lines: list[str]) -> tuple[dict[str, Any], list[str]]:
+    """Extract YAML metadata block from ``lines``.
+
+    Args:
+        lines: list of stripped lines to inspect
+
+    Returns:
+        Tuple of (metadata dict, remaining lines)
+    """
     if not lines or lines[0] != '---':
         return {}, lines
 
@@ -31,10 +39,18 @@ def _parse_metadata_block(lines: list[str]) -> tuple[dict[str, Any], list[str]]:
     if not isinstance(metadata, dict):
         metadata = {}
 
-    return metadata, lines[end_index + 1 :]
+    return metadata, lines[end_index + 1:]
 
 
 def _parse_transition(line: str) -> tuple[str, str, str | None] | None:
+    """Parse a transition line.
+
+    Args:
+        line: single diagram line
+
+    Returns:
+        (from_state, to_state, condition) or None if not a transition
+    """
     match = _TRANSITION_PATTERN.match(line)
     if match is None:
         return None
@@ -45,11 +61,20 @@ def _parse_transition(line: str) -> tuple[str, str, str | None] | None:
 
 
 def _append_state(states: list[str], state: str) -> None:
+    """Append state to list if not present and not the start marker."""
     if state and state != '[*]' and state not in states:
         states.append(state)
 
 
 def _append_transition(transitions: list[dict[str, Any]], from_state: str, to_state: str, condition: str | None) -> None:
+    """Add or merge a transition into the transitions list.
+
+    Args:
+        transitions: list to append/merge into
+        from_state: source state
+        to_state: destination state
+        condition: optional condition string
+    """
     if condition is None:
         transitions.append({'from': from_state, 'to': to_state})
         return
@@ -68,10 +93,12 @@ def _append_transition(transitions: list[dict[str, Any]], from_state: str, to_st
                     transition['conditions'].append(condition)
                 return
 
-    transitions.append({'from': from_state, 'to': to_state, 'condition': condition})
+    transitions.append(
+        {'from': from_state, 'to': to_state, 'condition': condition})
 
 
 def _format_scalar(value: Any) -> str:
+    """Format a Python value into a YAML-friendly scalar string."""
     if isinstance(value, str):
         if re.fullmatch(r'[A-Za-z0-9_]+', value):
             return value
@@ -80,6 +107,14 @@ def _format_scalar(value: Any) -> str:
 
 
 def _format_yaml(rule_data: dict[str, Any]) -> str:
+    """Serialize rule data to YAML string.
+
+    Args:
+        rule_data: mapping with 'metadata' and 'state_machine' keys
+
+    Returns:
+        YAML formatted string ending with a newline
+    """
     lines: list[str] = []
 
     metadata = rule_data.get('metadata', {}) or {}
@@ -90,18 +125,22 @@ def _format_yaml(rule_data: dict[str, Any]) -> str:
 
     state_machine = rule_data.get('state_machine', {}) or {}
     lines.append('state_machine:')
-    lines.append(f'  direction: {_format_scalar(state_machine.get("direction", "TB"))}')
-    lines.append(f'  initial_state: {_format_scalar(state_machine.get("initial_state", "start"))}')
+    lines.append(
+        f'  direction: {_format_scalar(state_machine.get("direction", "TB"))}')
+    lines.append(
+        f'  initial_state: {_format_scalar(state_machine.get("initial_state", "start"))}')
     lines.append('  states:')
     for state in state_machine.get('states', []):
         lines.append(f'    - {_format_scalar(state)}')
 
     lines.append('  transitions:')
     for transition in state_machine.get('transitions', []):
-        lines.append(f'    - from: {_format_scalar(transition.get("from", ""))}')
+        lines.append(
+            f'    - from: {_format_scalar(transition.get("from", ""))}')
         lines.append(f'      to: {_format_scalar(transition.get("to", ""))}')
         if 'condition' in transition:
-            lines.append(f'      condition: {_format_scalar(transition["condition"])}')
+            lines.append(
+                f'      condition: {_format_scalar(transition["condition"])}')
         elif 'conditions' in transition:
             lines.append('      conditions:')
             for condition in transition['conditions']:
@@ -111,8 +150,20 @@ def _format_yaml(rule_data: dict[str, Any]) -> str:
 
 
 def mermaid_to_yaml(mermaid_code: str, default_title: str | None = None) -> str:
-    """Convert Mermaid state diagram code into a YAML rule file string."""
-    raw_lines = [line.strip() for line in mermaid_code.splitlines() if line.strip()]
+    """Convert Mermaid state diagram text to a YAML rule string.
+
+    Args:
+        mermaid_code: Mermaid source text (may include metadata block)
+        default_title: title to use if metadata is absent
+
+    Returns:
+        YAML document as a string
+
+    Raises:
+        ValueError: if no 'stateDiagram-v2' header is found
+    """
+    raw_lines = [line.strip()
+                 for line in mermaid_code.splitlines() if line.strip()]
     metadata, lines = _parse_metadata_block(raw_lines)
 
     while lines and lines[0] != 'stateDiagram-v2':
@@ -162,8 +213,18 @@ def mermaid_to_yaml(mermaid_code: str, default_title: str | None = None) -> str:
 
 
 def mermaid_to_yaml_file(mermaid_code: str, file_path: str | Path, default_title: str | None = None) -> Path:
-    """Convert Mermaid code and write it to a YAML file."""
+    """Write converted YAML to file.
+
+    Args:
+        mermaid_code: Mermaid source text
+        file_path: destination file path
+        default_title: optional default title
+
+    Returns:
+        Path pointing to the written file
+    """
     target_path = Path(file_path)
     target_path.parent.mkdir(parents=True, exist_ok=True)
-    target_path.write_text(mermaid_to_yaml(mermaid_code, default_title=default_title), encoding='utf-8')
+    target_path.write_text(mermaid_to_yaml(
+        mermaid_code, default_title=default_title), encoding='utf-8')
     return target_path
