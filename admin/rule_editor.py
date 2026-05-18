@@ -1,4 +1,4 @@
-@from nicegui import ui
+from nicegui import ui
 from pathlib import Path
 import re
 
