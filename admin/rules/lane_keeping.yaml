@@ -3,7 +3,7 @@ metadata:
   severity: 4
   fine: 350
 state_machine:
-  direction: TB
+  direction: LR
   initial_state: idle
   states:
     - idle
