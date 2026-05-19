@@ -3,28 +3,28 @@ metadata:
   severity: 4
   fine: 350
 state_machine:
-  direction: TB
-  initial_state: centered
+  direction: LR
+  initial_state: idle
   states:
-    - centered
-    - drifting
-    - lane_departure
+    - idle
+    - warning
     - violation
   transitions:
     - from: "[*]"
-      to: centered
-    - from: centered
-      to: drifting
-      condition: "abs(lane_deviation) > 0.3m"
-    - from: drifting
-      to: centered
-      condition: "abs(lane_deviation) < 0.1m"
-    - from: drifting
-      to: lane_departure
-      condition: "abs(lane_deviation) > 0.7m"
-    - from: lane_departure
-      to: centered
-      condition: "indicator_on == True AND lane_change_complete"
-    - from: lane_departure
+      to: idle
+    - from: idle
+      to: warning
+      conditions:
+        - "abs_lane_deviation > 0.4 AND line_countinous"
+        - "abs_lane_deviation > 0.4 AND line_dashed AND indicator != direction"
+    - from: warning
+      to: idle
+      conditions:
+        - "line_dashed AND (indicator == direction OR abs_lane_deviation <= 0.4)"
+        - "line_countinous AND abs_lane_deviation <= 0.4"
+    - from: warning
       to: violation
-      condition: "abs(lane_deviation) > 1.2m AND indicator_on == False"
+      condition: "abs_lane_deviation > 0.7"
+    - from: violation
+      to: idle
+      condition: "abs_lane_deviation <= 0.4"

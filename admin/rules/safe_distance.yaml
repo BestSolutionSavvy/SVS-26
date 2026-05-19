@@ -1,30 +1,26 @@
 metadata:
   title: safe_distance
   severity: 3
-  fine: 250
+  fine: 30
 state_machine:
   direction: TB
-  initial_state: safe
+  initial_state: idle
   states:
-    - safe
+    - idle
     - warning
-    - emergency_braking
     - violation
   transitions:
     - from: "[*]"
-      to: safe
-    - from: safe
+      to: idle
+    - from: idle
       to: warning
-      condition: "distance_to_lead < threshold_min OR ttc < 2.5s"
+      condition: "distance_to_lead < threshold_safe"
     - from: warning
-      to: safe
-      condition: "distance_to_lead > threshold_safe AND ttc > 3.0s"
-    - from: warning
-      to: emergency_braking
-      condition: "ttc < 1.0s"
-    - from: emergency_braking
-      to: safe
-      condition: "ego_speed == 0"
+      to: idle
+      condition: "distance_to_lead >= threshold_safe"
     - from: warning
       to: violation
-      condition: "distance_to_lead <= 0"
+      condition: "distance_to_lead < threshold_min"
+    - from: violation
+      to: warning
+      condition: "distance_to_lead >= threshold_min"
