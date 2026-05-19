@@ -7,30 +7,24 @@ state_machine:
   initial_state: idle
   states:
     - idle
-    - warning_continous
-    - warning_dashed
+    - warning
     - violation
   transitions:
     - from: "[*]"
       to: idle
     - from: idle
-      to: warning_continous
-      condition: "abs_lane_deviation > 0.4m AND line_countinous"
-    - from: idle
-      to: warning_dashed
-      condition: "abs_lane_deviation > 0.4m AND line_dashed AND indicator != direction"
-    - from: warning_dashed
+      to: warning
+      conditions:
+        - "abs_lane_deviation > 0.4 AND line_countinous"
+        - "abs_lane_deviation > 0.4 AND line_dashed AND indicator != direction"
+    - from: warning
       to: idle
-      condition: "indicator == direction OR abs_lane_deviation <= 0.4m"
-    - from: warning_dashed
+      conditions:
+        - "line_dashed AND (indicator == direction OR abs_lane_deviation <= 0.4)"
+        - "line_countinous AND abs_lane_deviation <= 0.4"
+    - from: warning
       to: violation
-      condition: "abs_lane_deviation > 0.7m"
-    - from: warning_continous
-      to: idle
-      condition: "abs_lane_deviation <= 0.4m"
-    - from: warning_continous
-      to: violation
-      condition: "abs_lane_deviation > 0.7m"
+      condition: "abs_lane_deviation > 0.7"
     - from: violation
       to: idle
-      condition: "abs_lane_deviation <= 0.4m"
+      condition: "abs_lane_deviation <= 0.4"
