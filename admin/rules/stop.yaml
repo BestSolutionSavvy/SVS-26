@@ -3,28 +3,28 @@ metadata:
   severity: 4
   fine: 250
 state_machine:
-  direction: TB
+  direction: LR
   initial_state: idle
   states:
     - idle
-    - approaching
+    - warning
     - stopped
     - violation
   transitions:
     - from: "[*]"
       to: idle
     - from: idle
-      to: approaching
-      condition: "near_stop_sign == True AND distance_to_sign <= 20"
-    - from: approaching
+      to: warning
+      condition: "distance_to_sign <= 10"
+    - from: warning
       to: stopped
-      condition: "ego_speed < 0.5"
-    - from: approaching
-      to: violation
-      condition: "distance_to_sign <= 0"
+      condition: "ego_speed == 0.0 AND distance_to_sign <= 1"
     - from: stopped
       to: idle
       condition: "ego_speed >= 0.5"
+    - from: warning
+      to: violation
+      condition: "ego_speed > 0.0 distance_to_sign == 0"
     - from: violation
       to: idle
-      condition: "after(20 seconds)"
+      condition: "distance_to_sign > 10"
