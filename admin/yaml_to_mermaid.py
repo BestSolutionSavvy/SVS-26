@@ -21,6 +21,7 @@ def state_machine_to_mermaid(sm, metadata=None):
     direction = sm.get('direction', 'TB')
     initial_state = sm.get('initial_state', 'start')
     transitions = sm.get('transitions', [])
+    states = sm.get('states', [])
     
     lines = []
     
@@ -39,6 +40,11 @@ def state_machine_to_mermaid(sm, metadata=None):
     
     lines.append(f'\t[*] --> {initial_state}')
     
+    # Group transitions by their scope (parent state).
+    # For qualified states like "intersection.warning", extract the parent "intersection".
+    scope_transitions = {}
+    top_level_transitions = []
+    
     for trans in transitions:
         from_state = trans.get('from')
         to_state = trans.get('to')
@@ -48,8 +54,37 @@ def state_machine_to_mermaid(sm, metadata=None):
         if not from_state or not to_state:
             continue
         
-        if from_state == '[*]':
+        # Determine the scope: check both from and to for nested states
+        scope = None
+        if '.' in from_state:
+            scope = from_state.split('.')[0]
+        elif '.' in to_state:
+            scope = to_state.split('.')[0]
+        
+        # Skip top-level [*] transitions (already handled)
+        if from_state == '[*]' and scope is None:
             continue
+        
+        trans_record = {
+            'from': from_state,
+            'to': to_state,
+            'condition': condition,
+            'conditions': conditions
+        }
+        
+        if scope:
+            if scope not in scope_transitions:
+                scope_transitions[scope] = []
+            scope_transitions[scope].append(trans_record)
+        else:
+            top_level_transitions.append(trans_record)
+    
+    # Render top-level transitions
+    for trans in top_level_transitions:
+        from_state = trans['from']
+        to_state = trans['to']
+        condition = trans['condition']
+        conditions = trans['conditions']
         
         if condition:
             lines.append(f'\t{from_state} --> {to_state} : {condition}')
@@ -58,6 +93,67 @@ def state_machine_to_mermaid(sm, metadata=None):
                 lines.append(f'\t{from_state} --> {to_state} : {cond}')
         else:
             lines.append(f'\t{from_state} --> {to_state}')
+    
+    # Extract nested states (qualified with dot notation)
+    nested_scopes = {}
+    for state in states:
+        if '.' in state:
+            parts = state.split('.', 1)
+            parent = parts[0]
+            child = parts[1]
+            if parent not in nested_scopes:
+                nested_scopes[parent] = []
+            if child not in nested_scopes[parent]:
+                nested_scopes[parent].append(child)
+    
+    # Render nested state blocks
+    for parent in sorted(nested_scopes.keys()):
+        children = nested_scopes[parent]
+        lines.append(f'\tstate {parent} {{')
+        
+        # Render transitions within this scope
+        if parent in scope_transitions:
+            for trans in scope_transitions[parent]:
+                from_state = trans['from']
+                to_state = trans['to']
+                
+                # Handle display conversion for nested states
+                # If from_state is [*] or top-level, keep it as [*] (entry point)
+                if from_state == '[*]':
+                    from_display = '[*]'
+                elif '.' in from_state:
+                    # Remove parent prefix for display within scope
+                    from_display = from_state.split('.', 1)[1]
+                    # But if it's parent.start, convert to [*]
+                    if from_display == 'start':
+                        from_display = '[*]'
+                else:
+                    from_display = from_state
+                
+                # Same for to_state
+                if to_state == '[*]':
+                    to_display = '[*]'
+                elif '.' in to_state:
+                    # Remove parent prefix for display within scope
+                    to_display = to_state.split('.', 1)[1]
+                    # But if it's parent.end, convert to [*]
+                    if to_display == 'end':
+                        to_display = '[*]'
+                else:
+                    to_display = to_state
+                
+                condition = trans['condition']
+                conditions = trans['conditions']
+                
+                if condition:
+                    lines.append(f'\t\t{from_display} --> {to_display} : {condition}')
+                elif conditions:
+                    for cond in conditions:
+                        lines.append(f'\t\t{from_display} --> {to_display} : {cond}')
+                else:
+                    lines.append(f'\t\t{from_display} --> {to_display}')
+        
+        lines.append(f'\t}}')
     
     return '\n'.join(lines)
 

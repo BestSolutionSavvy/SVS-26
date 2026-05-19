@@ -177,9 +177,39 @@ def mermaid_to_yaml(mermaid_code: str, default_title: str | None = None) -> str:
     states: list[str] = []
     transitions: list[dict[str, Any]] = []
 
+    # Support nested `state NAME { ... }` blocks by tracking a scope stack.
+    scope_stack: list[str] = []
+
+    def _qualify(s: str) -> str:
+        """Qualify a state name with current scope unless it's the start marker or already qualified."""
+        if not s or s == '[*]':
+            return s
+        # If already qualified with a dot, assume it's fully-qualified
+        if '.' in s:
+            return s
+        if not scope_stack:
+            return s
+        # Don't qualify special scope markers
+        if s.endswith('.start') or s.endswith('.end'):
+            return s
+        return f"{'.'.join(scope_stack)}.{s}"
+
     for line in lines[1:]:
+        # handle direction
         if line.startswith('direction '):
             direction = line.split(None, 1)[1].strip() or 'TB'
+            continue
+
+        # enter a nested state block: `state NAME {`
+        m = re.match(r'state\s+(.+?)\s*\{', line)
+        if m:
+            scope_stack.append(m.group(1).strip())
+            continue
+
+        # leave a nested block
+        if line == '}':
+            if scope_stack:
+                scope_stack.pop()
             continue
 
         parsed_transition = _parse_transition(line)
@@ -187,13 +217,27 @@ def mermaid_to_yaml(mermaid_code: str, default_title: str | None = None) -> str:
             continue
 
         from_state, to_state, condition = parsed_transition
-        _append_transition(transitions, from_state, to_state, condition)
 
-        if from_state == '[*]':
-            initial_state = to_state
+        # If we're in a nested scope, convert [*] to scope.start or scope.end
+        if scope_stack:
+            scope_name = '.'.join(scope_stack)
+            if from_state == '[*]':
+                from_state = f"{scope_name}.start"
+            if to_state == '[*]':
+                to_state = f"{scope_name}.end"
+
+        # qualify states with current scope when appropriate
+        qualified_from = _qualify(from_state)
+        qualified_to = _qualify(to_state)
+
+        _append_transition(transitions, qualified_from, qualified_to, condition)
+
+        # Only treat top-level `[ * ]` as the global initial state
+        if from_state == '[*]' and not scope_stack:
+            initial_state = qualified_to
         else:
-            _append_state(states, from_state)
-        _append_state(states, to_state)
+            _append_state(states, qualified_from)
+        _append_state(states, qualified_to)
 
     if not metadata and default_title:
         metadata = {'title': default_title}
