@@ -2,6 +2,8 @@ metadata:
   title: lane_keeping
   severity: 4
   fine: 350
+  warning_threshold: 0.4
+  violation_threshold: 0.7
 state_machine:
   direction: LR
   initial_state: idle
@@ -15,16 +17,16 @@ state_machine:
     - from: idle
       to: warning
       conditions:
-        - "abs_lane_deviation > 0.4 AND line_countinous"
-        - "abs_lane_deviation > 0.4 AND line_dashed AND indicator != direction"
+        - "abs_lane_deviation > warning_threshold AND line_countinous"
+        - "abs_lane_deviation > warning_threshold AND line_dashed AND indicator != direction"
     - from: warning
       to: idle
       conditions:
-        - "line_dashed AND (indicator == direction OR abs_lane_deviation <= 0.4)"
-        - "line_countinous AND abs_lane_deviation <= 0.4"
+        - "line_dashed AND (indicator == direction OR abs_lane_deviation <= warning_threshold)"
+        - "line_countinous AND abs_lane_deviation <= warning_threshold"
     - from: warning
       to: violation
-      condition: "abs_lane_deviation > 0.7"
+      condition: "abs_lane_deviation > violation_threshold"
     - from: violation
       to: idle
-      condition: "abs_lane_deviation <= 0.4"
+      condition: "abs_lane_deviation <= warning_threshold"
