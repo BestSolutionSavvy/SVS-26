@@ -2,6 +2,8 @@ import carla
 import numpy as np
 import random
 import time
+import random
+import json
 
 def world_connect(name="localhost", port=2000, timeout=10.0):
     client = carla.Client(name, port)
@@ -154,3 +156,48 @@ def safe_destroy(actors):
 def draw_on_screen(world, transform, content="O", color=carla.Color(0, 255, 0), life_time=20):
     world.debug.draw_string(transform.location, content,
                             color=color, life_time=life_time)
+
+def spawn_random_vehicle_no_bike(world, spawn_index=0, autopilot=False):
+    """Spawn a random vehicle excluding bicycles"""
+    blueprint_library = world.get_blueprint_library()
+    all_vehicles = blueprint_library.filter("vehicle.*")
+    vehicles = [bp for bp in all_vehicles if "bicycle" not in bp.id]
+    if not vehicles:
+        vehicles = all_vehicles
+    
+    points = world.get_map().get_spawn_points()
+    if not points:
+        raise RuntimeError("No spawn points found")
+    
+    for k in range(len(points)):
+        vehicle_bp = random.choice(vehicles)
+        actor = world.try_spawn_actor(vehicle_bp, points[(spawn_index + k) % len(points)])
+        if actor is not None:
+            actor.set_autopilot(autopilot)
+            return actor
+    raise RuntimeError("Could not spawn vehicle")
+
+def write_log(filename, frame_count, timestamp, control, scene_data, reverse):
+    """Write frame data to JSON log file"""
+    log_entry = {
+        'frame': frame_count,
+        'timestamp': timestamp,
+        'reverse': reverse,
+        'control': {
+            'throttle': float(control.throttle),
+            'brake': float(control.brake),
+            'steer': float(control.steer)
+        },
+        'scene_data': {}
+    }
+    # Converti scene_data (che può avere oggetti CARLA) a tipi JSON-serializzabili
+    for key, value in scene_data.items():
+        if hasattr(value, '__dict__'):
+            log_entry['scene_data'][key] = str(value)
+        elif isinstance(value, (int, float, str, bool, type(None))):
+            log_entry['scene_data'][key] = value
+        else:
+            log_entry['scene_data'][key] = str(value)
+    
+    with open(filename, 'a') as f:
+        f.write(json.dumps(log_entry) + '\n')
