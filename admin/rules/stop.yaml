@@ -1,7 +1,5 @@
 metadata:
   title: Stop
-  severity: 4
-  fine: 250
 state_machine:
   direction: LR
   initial_state: idle
