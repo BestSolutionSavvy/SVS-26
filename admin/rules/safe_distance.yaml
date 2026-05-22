@@ -1,7 +1,5 @@
 metadata:
   title: safe_distance
-  severity: 3
-  fine: 30
 state_machine:
   direction: TB
   initial_state: idle

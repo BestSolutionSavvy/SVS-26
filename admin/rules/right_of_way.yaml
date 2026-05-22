@@ -1,17 +1,13 @@
 metadata:
   title: right_of_way
-  severity: 4
-  fine: 400
 state_machine:
-  direction: TB
+  direction: LR
   initial_state: idle
   states:
     - idle
     - intersection
-    - "intersection.start"
-    - "intersection.warning"
-    - "intersection.end"
-    - "intersection.violation"
+    - warning
+    - violation
   transitions:
     - from: "[*]"
       to: idle
@@ -19,14 +15,20 @@ state_machine:
       to: intersection
       condition: "ego_location == in_intersection AND precedence == True"
     - from: intersection
+      to: warning
+      condition: "broad_right_occupied == True"
+    - from: warning
+      to: intersection
+      condition: "broad_right_occupied == False"
+    - from: warning
       to: idle
       condition: "ego_location != in_intersection"
-    - from: "intersection.start"
-      to: "intersection.warning"
-      condition: "broad_right_occupied == True"
-    - from: "intersection.warning"
-      to: "intersection.end"
-      condition: "broad_right_occupied == False"
-    - from: "intersection.warning"
-      to: "intersection.violation"
+    - from: warning
+      to: violation
       condition: "narrow_right_occupied == True"
+    - from: violation
+      to: idle
+      condition: "ego_location != in_intersection"
+    - from: intersection
+      to: idle
+      condition: "ego_location != in_intersection"
