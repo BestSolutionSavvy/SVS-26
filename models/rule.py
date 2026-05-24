@@ -1,5 +1,5 @@
-from transition import Transition
-from state import State
+from .transition import Transition
+from .state import State
 
 
 class Rule:
@@ -22,7 +22,7 @@ class Rule:
     @property
     def initial_state(self) -> State:
         """Get the initial state of this rule."""
-        return self._transitions[0].source
+        return self._transitions[0].source if self._transitions else None
     
     def transitions_from(self, state: State) -> list[Transition]:
         """Get all transitions originating from a given state."""
