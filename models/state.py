@@ -11,17 +11,15 @@ class StateType(Enum):
 class State:
     """Represents a state with type, id, and name."""
     
-    def __init__(self, type: StateType, id: int, name: str):
+    def __init__(self, name: str):
         """
         Initialize a State.
         
         Args:
-            type: The StateType of this state
-            id: The unique identifier of this state
             name: The name of this state
         """
-        self.type = type
-        self.id = id
+        self.type = StateType._member_map_.get(name.upper(), StateType.IDLE)  # Default to IDLE if not found
+        self.id = id(self) 
         self.name = name
     
     def __repr__(self) -> str:

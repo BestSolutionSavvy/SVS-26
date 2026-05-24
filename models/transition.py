@@ -1,11 +1,10 @@
-from typing import Callable
 from state import State
 
 
 class Transition:
     """Represents a transition between two states with a condition."""
     
-    def __init__(self, condition: str, source: State, target: State, verify: Callable[[dict], bool]):
+    def __init__(self, condition: str, source: State, target: State):
         """
         Initialize a Transition.
         
@@ -13,12 +12,10 @@ class Transition:
             condition: The condition string for this transition (private)
             source: The source State
             target: The target State
-            verify: A callable that verifies the transition with data
         """
         self._condition = condition
         self.source = source
         self.target = target
-        self._verify = verify
     
     @property
     def condition(self) -> str:
@@ -35,7 +32,18 @@ class Transition:
         Returns:
             True if verification passes, False otherwise
         """
-        return self._verify(data)
+        return eval(self._condition, {}, data)
     
     def __repr__(self) -> str:
         return f"Transition(condition='{self._condition}', source={self.source.name}, target={self.target.name})"
+
+"""
+if __name__ == "__main__":
+    idle_state = State("idle")
+    warning_state = State("warning")
+    
+    transition = Transition("speed > 100", idle_state, warning_state)
+    
+    print(transition)
+    print(transition.verify({'speed': 120}))  # Should return True
+    print(transition.verify({'speed': 80}))   # Should return False """
