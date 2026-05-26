@@ -1,7 +1,5 @@
 metadata:
   title: lane_keeping
-  severity: 4
-  fine: 350
   warning_threshold: 0.4
   violation_threshold: 0.7
 state_machine:
