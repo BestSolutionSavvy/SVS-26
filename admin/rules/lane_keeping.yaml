@@ -8,7 +8,7 @@ state_machine:
   initial_state: idle
   states:
     - idle
-    - idle_countinous
+    - idle_continous
     - warning
     - idle_dashed
     - violation
@@ -16,29 +16,29 @@ state_machine:
     - from: "[*]"
       to: idle
     - from: idle
-      to: idle_countinous
-      condition: line_countinous
-    - from: idle_countinous
+      to: idle_continous
+      condition: line_continuous
+    - from: idle_continous
       to: warning
-      condition: "abs_lane_deviation > idle_threshold"
+      condition: "abs_lane_deviation > warning_threshold"
     - from: idle_dashed
       to: warning
       condition: "abs_lane_deviation > warning_threshold and indicator != direction"
     - from: idle
       to: idle_dashed
       condition: line_dashed
-    - from: idle_countinous
+    - from: idle_continous
       to: idle
       condition: line_dashed
     - from: idle_dashed
       to: idle
-      condition: line_countinous
+      condition: line_continuous
     - from: warning
       to: idle_dashed
       condition: "line_dashed and (indicator == direction or abs_lane_deviation <= warning_threshold)"
     - from: warning
-      to: idle_countinous
-      condition: "line_countinous and abs_lane_deviation <= warning_threshold"
+      to: idle_continous
+      condition: "line_continuous and abs_lane_deviation <= warning_threshold"
     - from: warning
       to: violation
       condition: "abs_lane_deviation > violation_threshold"
