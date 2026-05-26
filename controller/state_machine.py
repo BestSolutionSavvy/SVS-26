@@ -25,6 +25,7 @@ class StateMachine:
         Args:
             data: A dictionary of input data that may affect the state transitions
         """
+        data = {**self._rule.constants, **data}
         for transition in self._rule.transitions_from(self._current_state):
             if transition.verify(data):
                 self._current_state = transition.target

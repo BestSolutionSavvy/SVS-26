@@ -1,8 +1,9 @@
 metadata:
   title: Stop
-  warning_treshold: 10
-  stop_treshold: 1
-  stop_departure_speed: 0.5
+  constants:
+    warning_treshold: 10
+    stop_treshold: 1
+    stop_departure_speed: 0.5
 state_machine:
   direction: LR
   initial_state: idle

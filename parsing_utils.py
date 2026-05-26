@@ -51,12 +51,13 @@ def parse_rule_file(file_path: str) -> Rule:
     
     return Rule(
         name=data.get('metadata', {}).get('title', 'Unnamed Rule'),
+        constants=data.get('metadata', {}).get('constants', {}),
         transitions=transitions
     )
     
 
 if __name__ == "__main__":
-    parsed_data = parse_rule_file('./admin/rules/right_of_way.yaml')
+    parsed_data = parse_rule_file('./admin/rules/lane_keeping.yaml')
     print(parsed_data)
     print(f"Initial state: {parsed_data.initial_state}")
     def print_transitions(state, visited=None):
