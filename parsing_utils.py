@@ -39,15 +39,16 @@ def parse_rule_file(file_path: str) -> Rule:
     for t in state_machine.get('transitions', []):
         from_name = t.get('from', '')
         to_name = t.get('to', '')
-        if from_name not in states_dict:
-            states_dict[from_name] = State(from_name)
-        if to_name not in states_dict:
-            states_dict[to_name] = State(to_name)
-        transitions.append(Transition(
-            condition=t.get('condition', ''),
-            source=states_dict[from_name],
-            target=states_dict[to_name]
-        ))
+        if from_name != "[*]":
+            if from_name not in states_dict:
+                states_dict[from_name] = State(from_name)
+            if to_name not in states_dict:
+                states_dict[to_name] = State(to_name)
+            transitions.append(Transition(
+                condition=t.get('condition', ''),
+                source=states_dict[from_name],
+                target=states_dict[to_name]
+            ))
     
     return Rule(
         name=data.get('metadata', {}).get('title', 'Unnamed Rule'),
