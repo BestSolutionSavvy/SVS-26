@@ -4,21 +4,21 @@ state_machine:
   direction: TB
   initial_state: idle
   states:
-    - idle
-    - warning
-    - violation
+  - idle
+  - warning
+  - violation
   transitions:
-    - from: "[*]"
-      to: idle
-    - from: idle
-      to: warning
-      condition: "distance_to_lead < threshold_safe"
-    - from: warning
-      to: idle
-      condition: "distance_to_lead >= threshold_safe"
-    - from: warning
-      to: violation
-      condition: "distance_to_lead < threshold_min"
-    - from: violation
-      to: warning
-      condition: "distance_to_lead >= threshold_min"
+  - from: '[*]'
+    to: idle
+  - from: idle
+    to: warning
+    condition: distance_to_lead < threshold_safe
+  - from: warning
+    to: idle
+    condition: distance_to_lead >= threshold_safe
+  - from: warning
+    to: violation
+    condition: distance_to_lead < threshold_min
+  - from: violation
+    to: warning
+    condition: distance_to_lead >= threshold_min

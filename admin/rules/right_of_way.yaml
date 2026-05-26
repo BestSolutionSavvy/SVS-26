@@ -4,31 +4,31 @@ state_machine:
   direction: LR
   initial_state: idle
   states:
-    - idle
-    - intersection
-    - warning
-    - violation
+  - idle
+  - intersection
+  - warning
+  - violation
   transitions:
-    - from: "[*]"
-      to: idle
-    - from: idle
-      to: intersection
-      condition: "ego_location == in_intersection and precedence == True"
-    - from: intersection
-      to: warning
-      condition: "broad_right_occupied == True"
-    - from: warning
-      to: intersection
-      condition: "broad_right_occupied == False"
-    - from: warning
-      to: idle
-      condition: "ego_location != in_intersection"
-    - from: warning
-      to: violation
-      condition: "narrow_right_occupied == True"
-    - from: violation
-      to: idle
-      condition: "ego_location != in_intersection"
-    - from: intersection
-      to: idle
-      condition: "ego_location != in_intersection"
+  - from: '[*]'
+    to: idle
+  - from: idle
+    to: intersection
+    condition: ego_location == in_intersection and precedence == True
+  - from: intersection
+    to: warning
+    condition: broad_right_occupied == True
+  - from: warning
+    to: intersection
+    condition: broad_right_occupied == False
+  - from: warning
+    to: idle
+    condition: ego_location != in_intersection
+  - from: warning
+    to: violation
+    condition: narrow_right_occupied == True
+  - from: violation
+    to: idle
+    condition: ego_location != in_intersection
+  - from: intersection
+    to: idle
+    condition: ego_location != in_intersection
