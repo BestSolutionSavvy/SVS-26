@@ -3,6 +3,7 @@ import yaml
 from models.rule import Rule
 from models.state import State
 from models.transition import Transition
+from typing import List
 
 
 def parse_yaml(content: str) -> dict:
@@ -55,6 +56,17 @@ def parse_rule_file(file_path: str) -> Rule:
         constants=data.get('metadata', {}).get('constants', {}),
         transitions=transitions
     )
+    
+def parse_rule_files(folder_path: str) -> List[Rule]:
+    """Parse all YAML files in a folder and return a list of Rule objects"""
+    import os
+    rules = []
+    for filename in os.listdir(folder_path):
+        if filename.endswith('.yaml') or filename.endswith('.yml'):
+            rule = parse_rule_file(os.path.join(folder_path, filename))
+            if rule:
+                rules.append(rule)
+    return rules
     
 
 if __name__ == "__main__":

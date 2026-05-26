@@ -1,3 +1,4 @@
+from typing import List
 from .transition import Transition
 from .state import State
 
@@ -5,7 +6,7 @@ from .state import State
 class Rule:
     """Represents a road rule as a list of transitions between states."""
 
-    def __init__(self, name: str, constants: dict, transitions: list[Transition]):
+    def __init__(self, name: str, constants: dict, transitions: List[Transition]):
         """
         Initialize a Rule.
 
@@ -31,6 +32,6 @@ class Rule:
         """Get the constants for this rule."""
         return self._constants
 
-    def transitions_from(self, state: State) -> list[Transition]:
+    def transitions_from(self, state: State) -> List[Transition]:
         """Get all transitions originating from a given state."""
         return [t for t in self._transitions if t.source == state]
