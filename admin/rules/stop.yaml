@@ -8,25 +8,25 @@ state_machine:
   direction: LR
   initial_state: idle
   states:
-    - idle
-    - warning
-    - stopped
-    - violation
+  - idle
+  - warning
+  - stopped
+  - violation
   transitions:
-    - from: "[*]"
-      to: idle
-    - from: idle
-      to: warning
-      condition: "distance_to_sign <= warning_treshold"
-    - from: warning
-      to: stopped
-      condition: "ego_speed == 0.0 and distance_to_sign <= stop_treshold"
-    - from: stopped
-      to: idle
-      condition: "ego_speed >= stop_departure_speed"
-    - from: warning
-      to: violation
-      condition: "ego_speed > 0.0 distance_to_sign == 0"
-    - from: violation
-      to: idle
-      condition: "distance_to_sign > warning_treshold"
+  - from: '[*]'
+    to: idle
+  - from: idle
+    to: warning
+    condition: distance_to_sign <= warning_treshold
+  - from: warning
+    to: stopped
+    condition: ego_speed == 0.0 and distance_to_sign <= stop_treshold
+  - from: stopped
+    to: idle
+    condition: ego_speed >= stop_departure_speed
+  - from: warning
+    to: violation
+    condition: ego_speed > 0.0 distance_to_sign == 0
+  - from: violation
+    to: idle
+    condition: distance_to_sign > warning_treshold
