@@ -3,25 +3,41 @@ metadata:
   warning_threshold: 0.4
   violation_threshold: 0.7
 state_machine:
-  direction: LR
+  direction: TB
   initial_state: idle
   states:
     - idle
+    - idle_countinous
     - warning
+    - idle_dashed
     - violation
   transitions:
     - from: "[*]"
       to: idle
     - from: idle
+      to: idle_countinous
+      condition: line_countinous
+    - from: idle_countinous
       to: warning
-      conditions:
-        - "abs_lane_deviation > warning_threshold AND line_countinous"
-        - "abs_lane_deviation > warning_threshold AND line_dashed AND indicator != direction"
-    - from: warning
+      condition: "abs_lane_deviation > idle_threshold"
+    - from: idle_dashed
+      to: warning
+      condition: "abs_lane_deviation > warning_threshold and indicator != direction"
+    - from: idle
+      to: idle_dashed
+      condition: line_dashed
+    - from: idle_countinous
       to: idle
-      conditions:
-        - "line_dashed AND (indicator == direction OR abs_lane_deviation <= warning_threshold)"
-        - "line_countinous AND abs_lane_deviation <= warning_threshold"
+      condition: line_dashed
+    - from: idle_dashed
+      to: idle
+      condition: line_countinous
+    - from: warning
+      to: idle_dashed
+      condition: "line_dashed and (indicator == direction or abs_lane_deviation <= warning_threshold)"
+    - from: warning
+      to: idle_countinous
+      condition: "line_countinous and abs_lane_deviation <= warning_threshold"
     - from: warning
       to: violation
       condition: "abs_lane_deviation > violation_threshold"

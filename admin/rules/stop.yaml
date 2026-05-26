@@ -1,5 +1,8 @@
 metadata:
   title: Stop
+  warning_treshold: 10
+  stop_treshold: 1
+  stop_departure_speed: 0.5
 state_machine:
   direction: LR
   initial_state: idle
@@ -13,16 +16,16 @@ state_machine:
       to: idle
     - from: idle
       to: warning
-      condition: "distance_to_sign <= 10"
+      condition: "distance_to_sign <= warning_treshold"
     - from: warning
       to: stopped
-      condition: "ego_speed == 0.0 AND distance_to_sign <= 1"
+      condition: "ego_speed == 0.0 and distance_to_sign <= stop_treshold"
     - from: stopped
       to: idle
-      condition: "ego_speed >= 0.5"
+      condition: "ego_speed >= stop_departure_speed"
     - from: warning
       to: violation
       condition: "ego_speed > 0.0 distance_to_sign == 0"
     - from: violation
       to: idle
-      condition: "distance_to_sign > 10"
+      condition: "distance_to_sign > warning_treshold"
