@@ -5,20 +5,12 @@ from typing import Dict, Any, Optional, List
 class VariableBinder:
     """Binds guard variables to CARLA world queries."""
 
-    def __init__(self, world: carla.World, ego_vehicle: carla.Actor,
-                 static_params: Optional[Dict[str, float]] = None):
+    def __init__(self, world: carla.World, ego_vehicle: carla.Actor):
         self.world = world
         self.ego_vehicle = ego_vehicle
         self.map_obj = world.get_map()          # cached: never changes at runtime
         self.all_vehicles = list(world.get_actors().filter("vehicle.*"))  # cached: spawned once
         self.stop_signs = list(world.get_actors().filter("traffic.stop"))
-
-        self.static_params = static_params or {
-            'threshold_safe': 20.0,
-            'threshold_min': 10.0,
-            'warning_threshold': 0.4,
-            'violation_threshold': 0.7,
-        }
 
         self._vehicle_ahead = None
         self._sign_ahead = None
@@ -144,13 +136,23 @@ class VariableBinder:
                     return True
         return False
 
-    # --- Static parameters ---
+    def _calculate_safe_thresholds(self) -> Dict[str, float]:
+        """Calculate safe distance thresholds dynamically based on speed and weather.
+        Uses 2-second rule: distance = velocity * time_factor."""
+        ego_speed = self.get_ego_speed()
+        weather = self.world.get_weather()
 
-    def get_static_param(self, param_name: str, default: float = 0.0) -> float:
-        return self.static_params.get(param_name, default)
+        threshold_safe = ego_speed * 0.5
+        threshold_min = ego_speed * 0.25
 
-    def set_static_param(self, param_name: str, value: float) -> None:
-        self.static_params[param_name] = value
+        weather_multiplier = 1.0
+        if weather.precipitation > 0 or weather.fog_density > 0 or weather.sun_altitude_angle < 0:
+            weather_multiplier = 1.3
+
+        return {
+            'threshold_safe': threshold_safe * weather_multiplier,
+            'threshold_min': threshold_min * weather_multiplier,
+        }
 
     # --- Scene data ---
 
@@ -162,6 +164,7 @@ class VariableBinder:
         get_lane_marking_type() is called once and reused for both flags.
         """
         lane_marking = self.get_lane_marking_type()
+        safe_thresholds = self._calculate_safe_thresholds()
 
         return {
             # STOP
@@ -170,8 +173,8 @@ class VariableBinder:
 
             # SAFE_DISTANCE
             'distance_to_lead': self.get_distance_to_lead(),
-            'threshold_safe':   self.get_static_param('threshold_safe'),
-            'threshold_min':    self.get_static_param('threshold_min'),
+            'threshold_safe':   safe_thresholds['threshold_safe'],
+            'threshold_min':    safe_thresholds['threshold_min'],
 
             # RIGHT_OF_WAY
             'ego_location':          self.get_ego_location(),
@@ -182,8 +185,6 @@ class VariableBinder:
 
             # LANE_KEEPING
             'abs_lane_deviation':  self.get_abs_lane_deviation(),
-            'warning_threshold':   self.get_static_param('warning_threshold'),
-            'violation_threshold': self.get_static_param('violation_threshold'),
             'line_continuous':     lane_marking == 'continuous',
             'line_dashed':         lane_marking == 'dashed',
             'indicator':           self.get_indicator_state(),
@@ -191,4 +192,4 @@ class VariableBinder:
         }
 
     def __repr__(self) -> str:
-        return f"VariableBinder(ego_id={self.ego_vehicle.id}, params={self.static_params})"
+        return f"VariableBinder(ego_id={self.ego_vehicle.id})"
