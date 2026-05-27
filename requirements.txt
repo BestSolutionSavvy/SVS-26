@@ -1,6 +1,5 @@
 carla
 numpy
-carla
 pygame
 datetime
 pyyaml

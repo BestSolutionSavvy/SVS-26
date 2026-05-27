@@ -2,7 +2,6 @@
 Convert YAML rule files to Mermaid diagram code.
 """
 import yaml
-from pathlib import Path
 
 
 def state_machine_to_mermaid(sm, metadata=None):
@@ -26,12 +25,10 @@ def state_machine_to_mermaid(sm, metadata=None):
     
     if metadata:
         lines.append('---')
-        if 'title' in metadata:
-            lines.append(f'title: {metadata["title"]}')
-        if 'severity' in metadata:
-            lines.append(f'severity: {metadata["severity"]}')
-        if 'fine' in metadata:
-            lines.append(f'fine: {metadata["fine"]}')
+        # Dump metadata using YAML to preserve constants and quoting
+        md_text = yaml.safe_dump(metadata, sort_keys=False, allow_unicode=True).strip()
+        if md_text:
+            lines.extend(md_text.splitlines())
         lines.append('---')
     
     lines.append('stateDiagram-v2')

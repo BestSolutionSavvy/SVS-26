@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import re
-import json
 from pathlib import Path
 from typing import Any
 
@@ -22,20 +21,20 @@ def _parse_metadata_block(lines: list[str]) -> tuple[dict[str, Any], list[str]]:
     Returns:
         Tuple of (metadata dict, remaining lines)
     """
-    if not lines or lines[0] != '---':
+    if not lines or lines[0].strip() != '---':
         return {}, lines
 
     end_index = None
     for index in range(1, len(lines)):
-        if lines[index] == '---':
+        if lines[index].strip() == '---':
             end_index = index
             break
 
     if end_index is None:
         return {}, lines
 
-    metadata_text = '\n'.join(lines[1:end_index]).strip()
-    metadata = yaml.safe_load(metadata_text) if metadata_text else {}
+    metadata_text = '\n'.join(lines[1:end_index])
+    metadata = yaml.safe_load(metadata_text) if metadata_text.strip() else {}
     if not isinstance(metadata, dict):
         metadata = {}
 
@@ -95,58 +94,7 @@ def _append_transition(transitions: list[dict[str, Any]], from_state: str, to_st
 
     transitions.append(
         {'from': from_state, 'to': to_state, 'condition': condition})
-
-
-def _format_scalar(value: Any) -> str:
-    """Format a Python value into a YAML-friendly scalar string."""
-    if isinstance(value, str):
-        if re.fullmatch(r'[A-Za-z0-9_]+', value):
-            return value
-        return json.dumps(value, ensure_ascii=False)
-    return str(value)
-
-
-def _format_yaml(rule_data: dict[str, Any]) -> str:
-    """Serialize rule data to YAML string.
-
-    Args:
-        rule_data: mapping with 'metadata' and 'state_machine' keys
-
-    Returns:
-        YAML formatted string ending with a newline
-    """
-    lines: list[str] = []
-
-    metadata = rule_data.get('metadata', {}) or {}
-    lines.append('metadata:')
-    for key in ('title', 'severity', 'fine'):
-        if key in metadata:
-            lines.append(f'  {key}: {_format_scalar(metadata[key])}')
-
-    state_machine = rule_data.get('state_machine', {}) or {}
-    lines.append('state_machine:')
-    lines.append(
-        f'  direction: {_format_scalar(state_machine.get("direction", "TB"))}')
-    lines.append(
-        f'  initial_state: {_format_scalar(state_machine.get("initial_state", "start"))}')
-    lines.append('  states:')
-    for state in state_machine.get('states', []):
-        lines.append(f'    - {_format_scalar(state)}')
-
-    lines.append('  transitions:')
-    for transition in state_machine.get('transitions', []):
-        lines.append(
-            f'    - from: {_format_scalar(transition.get("from", ""))}')
-        lines.append(f'      to: {_format_scalar(transition.get("to", ""))}')
-        if 'condition' in transition:
-            lines.append(
-                f'      condition: {_format_scalar(transition["condition"])}')
-        elif 'conditions' in transition:
-            lines.append('      conditions:')
-            for condition in transition['conditions']:
-                lines.append(f'        - {_format_scalar(condition)}')
-
-    return '\n'.join(lines) + '\n'
+    
 
 
 def mermaid_to_yaml(mermaid_code: str, default_title: str | None = None) -> str:
@@ -162,9 +110,13 @@ def mermaid_to_yaml(mermaid_code: str, default_title: str | None = None) -> str:
     Raises:
         ValueError: if no 'stateDiagram-v2' header is found
     """
-    raw_lines = [line.strip()
-                 for line in mermaid_code.splitlines() if line.strip()]
-    metadata, lines = _parse_metadata_block(raw_lines)
+    # Keep original lines (preserve indentation) for YAML metadata parsing,
+    # then normalize remaining lines for diagram parsing.
+    raw_lines = mermaid_code.splitlines()
+    metadata, remaining = _parse_metadata_block(raw_lines)
+
+    # Normalize remaining lines: strip and drop empties for diagram parsing
+    lines = [ln.strip() for ln in remaining if ln.strip()]
 
     while lines and lines[0] != 'stateDiagram-v2':
         lines = lines[1:]
@@ -209,7 +161,7 @@ def mermaid_to_yaml(mermaid_code: str, default_title: str | None = None) -> str:
             'transitions': transitions,
         },
     }
-    return _format_yaml(rule_data)
+    return yaml.safe_dump(rule_data, sort_keys=False, allow_unicode=True)
 
 
 def mermaid_to_yaml_file(mermaid_code: str, file_path: str | Path, default_title: str | None = None) -> Path:
