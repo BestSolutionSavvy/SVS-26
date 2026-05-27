@@ -5,10 +5,17 @@ import time
 import random
 import json
 
-def world_connect(name="localhost", port=2000, timeout=10.0):
+def world_connect(name="localhost", port=2000, timeout=20.0, map_name=None):
     client = carla.Client(name, port)
     client.set_timeout(timeout)
-    world = client.get_world()
+    
+    if map_name:
+        print(f"Caricamento di {map_name} in corso...")
+        world = client.load_world(map_name)
+        print("Mappa caricata con successo!")
+    else:
+        world = client.get_world()
+        
     spectator = world.get_spectator()
     return world, spectator, client
 

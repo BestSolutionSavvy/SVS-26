@@ -125,21 +125,21 @@ class RCADisplay:
     # ------------------------------------------------------------------
 
     def _handle_joystick_button(self, button: int):
-        if button == 0:     # A → toggle reverse
+        if button == 0:     # A -> toggle reverse
             self.reverse = not self.reverse
             if self.reverse:
                 self.current_lights |= int(carla.VehicleLightState.Reverse)
             else:
                 self.current_lights &= ~int(carla.VehicleLightState.Reverse)
             self.ego_vehicle.set_light_state(carla.VehicleLightState(self.current_lights))
-        elif button == 1:   # B → hazard (4 frecce)
+        elif button == 1:   # B -> hazard
             self.current_lights ^= int(carla.VehicleLightState.LeftBlinker)
             self.current_lights ^= int(carla.VehicleLightState.RightBlinker)
             self.ego_vehicle.set_light_state(carla.VehicleLightState(self.current_lights))
-        elif button == 4:   # paddle sx → freccia sinistra
+        elif button == 4:   # paddle sx -> left blinker indicator
             self.current_lights ^= int(carla.VehicleLightState.LeftBlinker)
             self.ego_vehicle.set_light_state(carla.VehicleLightState(self.current_lights))
-        elif button == 5:   # paddle dx → freccia destra
+        elif button == 5:   # paddle dx -> right blinker indicator
             self.current_lights ^= int(carla.VehicleLightState.RightBlinker)
             self.ego_vehicle.set_light_state(carla.VehicleLightState(self.current_lights))
 
