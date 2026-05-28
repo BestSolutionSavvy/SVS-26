@@ -11,8 +11,9 @@ os.environ["SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS"] = "1"
 WIDTH = 800
 HEIGHT = 600
 
-class RCADisplay:
+class PygameDisplay:
     def __init__(self, world, ego_vehicle, width=WIDTH, height=HEIGHT):
+        """Handles rendering the camera feed and processing user input for controlling the vehicle."""
         self.world = world
         self.ego_vehicle = ego_vehicle
         self.width = width
@@ -22,12 +23,16 @@ class RCADisplay:
         self._surface_lock = threading.Lock()
         self._camera = None
 
-        self.control = carla.VehicleControl()
+        self._control = carla.VehicleControl()
         self.reverse = False
         self.running = True
 
         self._screen = None
         self._joystick = None
+
+    @property
+    def control(self):
+        return self._control
 
     def start(self):
         pygame.init()
@@ -49,7 +54,7 @@ class RCADisplay:
         self._camera = self.world.spawn_actor(bp, cam_transform, attach_to=self.ego_vehicle)
         
         weak_self = weakref.ref(self)
-        self._camera.listen(lambda img: RCADisplay._on_image(weak_self, img))
+        self._camera.listen(lambda img: PygameDisplay._on_image(weak_self, img))
 
     @staticmethod
     def _on_image(weak_self, image):
@@ -84,20 +89,16 @@ class RCADisplay:
             throttle = (self._joystick.get_axis(1) + 1.0) / 2.0
             brake = (self._joystick.get_axis(2) + 1.0) / 2.0
 
-            self.control.steer = steer**3 if abs(steer) > 0.05 else 0.0
-            self.control.throttle = throttle if throttle > 0.05 else 0.0
-            self.control.brake = brake if brake > 0.05 else 0.0
+            self._control.steer = steer**3 if abs(steer) > 0.05 else 0.0
+            self._control.throttle = throttle if throttle > 0.05 else 0.0
+            self._control.brake = brake if brake > 0.05 else 0.0
         else:
             keys = pygame.key.get_pressed()
-            self.control.throttle = 1.0 if keys[pygame.K_w] else 0.0
-            self.control.steer = -0.5 if keys[pygame.K_a] else (0.5 if keys[pygame.K_d] else 0.0)
-            self.control.brake = 1.0 if keys[pygame.K_s] else 0.0
+            self._control.throttle = 1.0 if keys[pygame.K_w] else 0.0
+            self._control.steer = -0.5 if keys[pygame.K_a] else (0.5 if keys[pygame.K_d] else 0.0)
+            self._control.brake = 1.0 if keys[pygame.K_s] else 0.0
 
-        self.control.reverse = self.reverse
-        # self.ego_vehicle.apply_control(self.control)
-
-    def get_control(self):
-        return self.control
+        self._control.reverse = self.reverse
     
     def _render(self):
         with self._surface_lock:

@@ -10,9 +10,9 @@ def world_connect(name="localhost", port=2000, timeout=20.0, map_name=None):
     client.set_timeout(timeout)
     
     if map_name:
-        print(f"Caricamento di {map_name} in corso...")
+        print(f"Loading of {map_name} in progress...")
         world = client.load_world(map_name)
-        print("Mappa caricata con successo!")
+        print("Map loaded successfully!")
     else:
         world = client.get_world()
         

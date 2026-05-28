@@ -1,8 +1,8 @@
 import carla
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 
 
-class VariableBinder:
+class DataBinder:
     """Binds guard variables to CARLA world queries."""
 
     def __init__(self, world: carla.World, ego_vehicle: carla.Actor):
@@ -190,6 +190,3 @@ class VariableBinder:
             'indicator':           self.get_indicator_state(),
             'direction':           self.get_steering_direction(),
         }
-
-    def __repr__(self) -> str:
-        return f"VariableBinder(ego_id={self.ego_vehicle.id})"
