@@ -29,6 +29,7 @@ class PygameDisplay:
 
         self._screen = None
         self._joystick = None
+        self.current_lights = 0
 
     @property
     def control(self):
@@ -72,8 +73,13 @@ class PygameDisplay:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
-            elif event.type == pygame.KEYDOWN and event.key == pygame.K_r:
-                self.reverse = not self.reverse
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_r:
+                    self.reverse = not self.reverse
+                elif event.key in (pygame.K_q, pygame.K_ESCAPE):
+                    self.running = False
+            elif event.type == pygame.JOYBUTTONDOWN and self._joystick:
+                self._handle_joystick_button(event.button)
 
         if not self.running:
             return False
@@ -99,6 +105,26 @@ class PygameDisplay:
             self._control.brake = 1.0 if keys[pygame.K_s] else 0.0
 
         self._control.reverse = self.reverse
+
+    def _handle_joystick_button(self, button: int):
+        """Handle joystick button presses for light control."""
+        if button == 0:     # A -> toggle reverse
+            self.reverse = not self.reverse
+            if self.reverse:
+                self.current_lights |= int(carla.VehicleLightState.Reverse)
+            else:
+                self.current_lights &= ~int(carla.VehicleLightState.Reverse)
+            self.ego_vehicle.set_light_state(carla.VehicleLightState(self.current_lights))
+        elif button == 1:   # B -> hazard
+            self.current_lights ^= int(carla.VehicleLightState.LeftBlinker)
+            self.current_lights ^= int(carla.VehicleLightState.RightBlinker)
+            self.ego_vehicle.set_light_state(carla.VehicleLightState(self.current_lights))
+        elif button == 4:   # paddle sx -> left blinker indicator
+            self.current_lights ^= int(carla.VehicleLightState.LeftBlinker)
+            self.ego_vehicle.set_light_state(carla.VehicleLightState(self.current_lights))
+        elif button == 5:   # paddle dx -> right blinker indicator
+            self.current_lights ^= int(carla.VehicleLightState.RightBlinker)
+            self.ego_vehicle.set_light_state(carla.VehicleLightState(self.current_lights))
     
     def _render(self):
         with self._surface_lock:
