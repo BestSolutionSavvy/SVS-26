@@ -2,6 +2,20 @@ import carla
 from typing import Dict, Any, Optional
 
 
+class LazyDict(dict):
+    def __init__(self, resolvers: dict):
+        super().__init__()
+        self._resolvers = resolvers
+
+    def __missing__(self, key):
+        if key not in self._resolvers:
+            raise KeyError(key)
+        print(f"  → calcolo '{key}'")
+        value = self._resolvers[key]()
+        self[key] = value
+        return value
+
+
 class DataBinder:
     """Binds guard variables to CARLA world queries."""
 
@@ -9,7 +23,8 @@ class DataBinder:
         self.world = world
         self.ego_vehicle = ego_vehicle
         self.map_obj = world.get_map()          # cached: never changes at runtime
-        self.all_vehicles = list(world.get_actors().filter("vehicle.*"))  # cached: spawned once
+        self.all_vehicles = list(world.get_actors().filter(
+            "vehicle.*"))  # cached: spawned once
         self.stop_signs = list(world.get_actors().filter("traffic.stop"))
 
         self._vehicle_ahead = None
@@ -26,10 +41,10 @@ class DataBinder:
 
     def get_ego_forward_vector(self) -> carla.Vector3D:
         return self.ego_vehicle.get_transform().get_forward_vector()
-    
+
     def get_distance_to_sign(self, sign_type: str = "stop") -> float:
         """Distance to the nearest sign ahead on the same lane.
-        
+
         Returns:
             - Positive: sign is ahead of ego (before waypoint)
             - Negative: sign is behind ego (already crossed)
@@ -38,48 +53,51 @@ class DataBinder:
         ego_tf = self.ego_vehicle.get_transform()
         ego_loc = ego_tf.location
         ego_fwd = ego_tf.get_forward_vector()
-        
-        signs = self.stop_signs if sign_type == "stop" else list(self.world.get_actors().filter(f"traffic.{sign_type}"))
-        
+
+        signs = self.stop_signs if sign_type == "stop" else list(
+            self.world.get_actors().filter(f"traffic.{sign_type}"))
+
         # Get ego's current lane
         try:
-            ego_waypoint = self.map_obj.get_waypoint(ego_loc, project_to_road=True)
+            ego_waypoint = self.map_obj.get_waypoint(
+                ego_loc, project_to_road=True)
             ego_lane_id = ego_waypoint.lane_id
         except:
             ego_lane_id = None
-        
+
         min_signed_dist = float('inf')
         best_sign = None
-        
+
         for sign in signs:
             sign_loc = sign.get_location()
             rel_vec = sign_loc - ego_loc
-            
+
             # Dot product to check if sign is ahead (positive) or behind (negative)
             dot_product = rel_vec.x * ego_fwd.x + rel_vec.y * ego_fwd.y
-            
+
             # Only consider signs that are somewhat ahead (dot >= -5.0 to catch signs we just passed)
             if dot_product < -5.0:
                 continue
-            
+
             # Check if sign is on the same lane (heading-wise)
             try:
-                sign_waypoint = self.map_obj.get_waypoint(sign_loc, project_to_road=True)
+                sign_waypoint = self.map_obj.get_waypoint(
+                    sign_loc, project_to_road=True)
                 # Only consider signs on the same lane_id
                 if ego_lane_id is not None and sign_waypoint.lane_id != ego_lane_id:
                     continue
             except:
                 pass
-            
+
             # Calculate signed distance: positive ahead, negative behind
             distance = ego_loc.distance(sign_loc)
             signed_dist = distance if dot_product >= 0 else -distance
-            
+
             # Keep the closest (most relevant) sign
             if abs(signed_dist) < abs(min_signed_dist):
                 min_signed_dist = signed_dist
                 best_sign = sign
-        
+
         self._sign_ahead = best_sign
         return min_signed_dist
 
@@ -88,7 +106,7 @@ class DataBinder:
         ego_tf = self.ego_vehicle.get_transform()
         ego_loc = ego_tf.location
         ego_fwd = ego_tf.get_forward_vector()
-        
+
         # Ego front bumper location
         ego_bbox = self.ego_vehicle.bounding_box
         ego_front = ego_loc + carla.Location(
@@ -96,38 +114,40 @@ class DataBinder:
             y=ego_fwd.y * ego_bbox.extent.x,
             z=0  # Keep z at center level
         )
-        
+
         try:
-            ego_waypoint = self.map_obj.get_waypoint(ego_loc, project_to_road=True)
+            ego_waypoint = self.map_obj.get_waypoint(
+                ego_loc, project_to_road=True)
             ego_lane_id = ego_waypoint.lane_id
         except:
             ego_lane_id = None
-        
+
         min_dist = float('inf')
         best_vehicle = None
-        
+
         # Refresh vehicle list from world (don't use cached list)
         current_vehicles = list(self.world.get_actors().filter("vehicle.*"))
-        
+
         for v in current_vehicles:
             if v.id == self.ego_vehicle.id:
                 continue
-            
+
             v_loc = v.get_transform().location
             rel_vec = v_loc - ego_loc
             dot = rel_vec.x * ego_fwd.x + rel_vec.y * ego_fwd.y
             if dot < 0:
                 continue
-            
+
             try:
-                v_waypoint = self.map_obj.get_waypoint(v_loc, project_to_road=True)
+                v_waypoint = self.map_obj.get_waypoint(
+                    v_loc, project_to_road=True)
                 v_lane_id = v_waypoint.lane_id
-                
+
                 if ego_lane_id is not None and abs(v_lane_id - ego_lane_id) > 1:
                     continue
             except:
                 continue
-            
+
             # Vehicle rear bumper location
             v_tf = v.get_transform()
             v_fwd = v_tf.get_forward_vector()
@@ -137,12 +157,12 @@ class DataBinder:
                 y=v_fwd.y * v_bbox.extent.x,
                 z=0  # Keep z at center level
             )
-            
+
             dist = ego_front.distance(v_back)
             if dist < min_dist:
                 min_dist = dist
                 best_vehicle = v
-        
+
         self._vehicle_ahead = best_vehicle
         return min_dist
 
@@ -210,8 +230,8 @@ class DataBinder:
         ego_loc = ego_tf.location
         ego_fwd = ego_tf.get_forward_vector()
         right_vec = ego_tf.get_right_vector()
-        fwd_range   = 15.0 if narrow else 30.0
-        right_range = 1.5  if narrow else 3.0
+        fwd_range = 15.0 if narrow else 30.0
+        right_range = 1.5 if narrow else 3.0
         for v in self.all_vehicles:
             if v.id == self.ego_vehicle.id:
                 continue
@@ -243,37 +263,44 @@ class DataBinder:
 
     # --- Scene data ---
 
-    def compute_scene_data(self) -> Dict[str, Any]:
-        """Compute all guard variables for the current frame.
+    def compute_scene_data(self) -> LazyDict:
+        """Compute all guard variables for the current scene. Uses lazy evaluation and caching."""
+        
+        lane_marking_cache = {}
+        safe_thresh_cache = {}
 
-        No world.get_actors() calls here: vehicles are cached at init.
-        No world.get_map() calls here: map is cached at init.
-        get_lane_marking_type() is called once and reused for both flags.
-        """
-        lane_marking = self.get_lane_marking_type()
-        safe_thresholds = self._calculate_safe_thresholds()
+        def lane_marking():
+            if not lane_marking_cache:
+                lane_marking_cache['v'] = self.get_lane_marking_type()
+            return lane_marking_cache['v']
 
-        return {
+        def safe_thresh():
+            if not safe_thresh_cache:
+                safe_thresh_cache['v'] = self._calculate_safe_thresholds()
+            return safe_thresh_cache['v']
+
+        resolvers = {
             # STOP
-            'distance_to_sign': self.get_distance_to_sign(),
-            'ego_speed':        self.get_ego_speed(),
+            'distance_to_sign': self.get_distance_to_sign,
+            'ego_speed':        self.get_ego_speed,
 
             # SAFE_DISTANCE
-            'distance_to_lead': self.get_distance_to_lead(),
-            'threshold_safe':   safe_thresholds['threshold_safe'],
-            'threshold_min':    safe_thresholds['threshold_min'],
+            'distance_to_lead': self.get_distance_to_lead,
+            'threshold_safe': lambda: safe_thresh()['threshold_safe'],
+            'threshold_min': lambda: safe_thresh()['threshold_min'],
 
             # RIGHT_OF_WAY
-            'ego_location':          self.get_ego_location(),
-            'in_intersection':       self.is_in_intersection(),
-            'precedence':            self.has_right_of_way(),
-            'broad_right_occupied':  self.is_vehicle_on_right(narrow=False),
-            'narrow_right_occupied': self.is_vehicle_on_right(narrow=True),
+            'ego_location':          self.get_ego_location,
+            'in_intersection':       self.is_in_intersection,
+            'precedence':            self.has_right_of_way,
+            'broad_right_occupied': lambda: self.is_vehicle_on_right(narrow=False),
+            'narrow_right_occupied': lambda: self.is_vehicle_on_right(narrow=True),
 
             # LANE_KEEPING
-            'abs_lane_deviation':  self.get_abs_lane_deviation(),
-            'line_continuous':     lane_marking == 'continuous',
-            'line_dashed':         lane_marking == 'dashed',
-            'indicator':           self.get_indicator_state(),
-            'direction':           self.get_steering_direction(),
+            'abs_lane_deviation': self.get_abs_lane_deviation,
+            'line_continuous': lambda: lane_marking() == 'continuous',
+            'line_dashed': lambda: lane_marking() == 'dashed',
+            'indicator':          self.get_indicator_state,
+            'direction':          self.get_steering_direction,
         }
+        return LazyDict(resolvers)
