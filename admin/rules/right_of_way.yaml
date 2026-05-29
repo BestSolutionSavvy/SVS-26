@@ -13,7 +13,7 @@ state_machine:
     to: idle
   - from: idle
     to: intersection
-    condition: ego_location == in_intersection and precedence == True
+    condition: in_intersection == True and precedence == True
   - from: intersection
     to: warning
     condition: broad_right_occupied == True
@@ -22,13 +22,13 @@ state_machine:
     condition: broad_right_occupied == False
   - from: warning
     to: idle
-    condition: ego_location != in_intersection
+    condition: in_intersection == False
   - from: warning
     to: violation
     condition: narrow_right_occupied == True
   - from: violation
     to: idle
-    condition: ego_location != in_intersection
+    condition: in_intersection == False
   - from: intersection
     to: idle
-    condition: ego_location != in_intersection
+    condition: in_intersection == False

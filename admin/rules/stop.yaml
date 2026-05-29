@@ -26,7 +26,7 @@ state_machine:
     condition: ego_speed >= stop_departure_speed
   - from: warning
     to: violation
-    condition: ego_speed > 0.0 distance_to_sign == 0
+    condition: ego_speed > 0.0 and distance_to_sign <= 0.5 and distance_to_sign >= -2
   - from: violation
     to: idle
     condition: distance_to_sign > warning_treshold

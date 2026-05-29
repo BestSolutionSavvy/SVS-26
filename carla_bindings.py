@@ -28,34 +28,121 @@ class DataBinder:
         return self.ego_vehicle.get_transform().get_forward_vector()
     
     def get_distance_to_sign(self, sign_type: str = "stop") -> float:
-        ego_loc = self.get_ego_location()
-        signs = self.stop_signs if sign_type == "stop" else list(self.world.get_actors().filter(f"traffic.{sign_type}"))
-        min_dist = float('inf')
-        for sign in signs:
-            dist = ego_loc.distance(sign.get_location())
-            if dist < min_dist:
-                min_dist = dist
-                self._sign_ahead = sign
-        return min_dist
-
-    def get_distance_to_lead(self) -> float:
-        """Distance to the nearest vehicle directly ahead. Returns inf if none."""
+        """Distance to the nearest sign ahead on the same lane.
+        
+        Returns:
+            - Positive: sign is ahead of ego (before waypoint)
+            - Negative: sign is behind ego (already crossed)
+            - inf: no sign found on the ego's direction/lane
+        """
         ego_tf = self.ego_vehicle.get_transform()
         ego_loc = ego_tf.location
         ego_fwd = ego_tf.get_forward_vector()
+        
+        signs = self.stop_signs if sign_type == "stop" else list(self.world.get_actors().filter(f"traffic.{sign_type}"))
+        
+        # Get ego's current lane
+        try:
+            ego_waypoint = self.map_obj.get_waypoint(ego_loc, project_to_road=True)
+            ego_lane_id = ego_waypoint.lane_id
+        except:
+            ego_lane_id = None
+        
+        min_signed_dist = float('inf')
+        best_sign = None
+        
+        for sign in signs:
+            sign_loc = sign.get_location()
+            rel_vec = sign_loc - ego_loc
+            
+            # Dot product to check if sign is ahead (positive) or behind (negative)
+            dot_product = rel_vec.x * ego_fwd.x + rel_vec.y * ego_fwd.y
+            
+            # Only consider signs that are somewhat ahead (dot >= -5.0 to catch signs we just passed)
+            if dot_product < -5.0:
+                continue
+            
+            # Check if sign is on the same lane (heading-wise)
+            try:
+                sign_waypoint = self.map_obj.get_waypoint(sign_loc, project_to_road=True)
+                # Only consider signs on the same lane_id
+                if ego_lane_id is not None and sign_waypoint.lane_id != ego_lane_id:
+                    continue
+            except:
+                pass
+            
+            # Calculate signed distance: positive ahead, negative behind
+            distance = ego_loc.distance(sign_loc)
+            signed_dist = distance if dot_product >= 0 else -distance
+            
+            # Keep the closest (most relevant) sign
+            if abs(signed_dist) < abs(min_signed_dist):
+                min_signed_dist = signed_dist
+                best_sign = sign
+        
+        self._sign_ahead = best_sign
+        return min_signed_dist
+
+    def get_distance_to_lead(self) -> float:
+        """Distance from ego front bumper to lead vehicle rear bumper. Returns inf if none."""
+        ego_tf = self.ego_vehicle.get_transform()
+        ego_loc = ego_tf.location
+        ego_fwd = ego_tf.get_forward_vector()
+        
+        # Ego front bumper location
+        ego_bbox = self.ego_vehicle.bounding_box
+        ego_front = ego_loc + carla.Location(
+            x=ego_fwd.x * ego_bbox.extent.x,
+            y=ego_fwd.y * ego_bbox.extent.x,
+            z=0  # Keep z at center level
+        )
+        
+        try:
+            ego_waypoint = self.map_obj.get_waypoint(ego_loc, project_to_road=True)
+            ego_lane_id = ego_waypoint.lane_id
+        except:
+            ego_lane_id = None
+        
         min_dist = float('inf')
         best_vehicle = None
-        for v in self.all_vehicles:
+        
+        # Refresh vehicle list from world (don't use cached list)
+        current_vehicles = list(self.world.get_actors().filter("vehicle.*"))
+        
+        for v in current_vehicles:
             if v.id == self.ego_vehicle.id:
                 continue
+            
             v_loc = v.get_transform().location
             rel_vec = v_loc - ego_loc
             dot = rel_vec.x * ego_fwd.x + rel_vec.y * ego_fwd.y
-            if dot > 0:
-                dist = ego_loc.distance(v_loc)
-                if dist < min_dist:
-                    min_dist = dist
-                    best_vehicle = v
+            if dot < 0:
+                continue
+            
+            try:
+                v_waypoint = self.map_obj.get_waypoint(v_loc, project_to_road=True)
+                v_lane_id = v_waypoint.lane_id
+                
+                if ego_lane_id is not None and abs(v_lane_id - ego_lane_id) > 1:
+                    continue
+            except:
+                continue
+            
+            # Vehicle rear bumper location
+            v_tf = v.get_transform()
+            v_fwd = v_tf.get_forward_vector()
+            v_bbox = v.bounding_box
+            v_back = v_loc - carla.Location(
+                x=v_fwd.x * v_bbox.extent.x,
+                y=v_fwd.y * v_bbox.extent.x,
+                z=0  # Keep z at center level
+            )
+            
+            dist = ego_front.distance(v_back)
+            if dist < min_dist:
+                min_dist = dist
+                best_vehicle = v
+        
         self._vehicle_ahead = best_vehicle
         return min_dist
 

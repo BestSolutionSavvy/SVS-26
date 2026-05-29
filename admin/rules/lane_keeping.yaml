@@ -23,7 +23,7 @@ state_machine:
     condition: abs_lane_deviation > warning_threshold
   - from: idle_dashed
     to: warning
-    condition: abs_lane_deviation > warning_threshold and indicator != direction
+    condition: abs_lane_deviation > warning_threshold and indicator == None
   - from: idle
     to: idle_dashed
     condition: line_dashed
