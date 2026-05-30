@@ -33,6 +33,7 @@ class DataBinder:
         self._sign_ahead = None
         self._last_lateral_offset = 0.0
         self._offset_history = deque(maxlen=30)  # Rolling window of last 30 lateral offsets
+        self._last_indicator = None  # Track previous indicator to detect changes
 
     # --- Dynamic variables ---
 
@@ -240,9 +241,14 @@ class DataBinder:
         - Maintain a rolling window of last 30 lateral offsets
         - Calculate net (accumulated) movement direction
         - If indicator is active, verify movement matches indicator
-        - Allows smooth lane changes (oscillations) but catches opposite movements
+        - Resets accumulation when indicator changes to avoid contamination
         """
         indicator = self.get_indicator_state()
+        
+        # Reset accumulation if indicator changed
+        if indicator != self._last_indicator:
+            self._offset_history.clear()
+            self._last_indicator = indicator
         
         ego_loc = self.get_ego_location()
         current_offset = 0.0
@@ -259,28 +265,24 @@ class DataBinder:
         self._offset_history.append(current_offset)
         self._last_lateral_offset = current_offset
         
-        # Calculate accumulated (net) movement over rolling window
+        # Calculate accumulated net movement over rolling window
         accumulated = sum(self._offset_history) if self._offset_history else 0.0
         window_size = len(self._offset_history)
         avg_offset = accumulated / window_size if window_size > 0 else 0.0
         
-        # Determine direction from net movement (with hysteresis: 0.05m threshold)
-        if abs(avg_offset) > 0.05:
+        # Determine direction from net movement (threshold: 0.01m)
+        if abs(avg_offset) > 0.01:
             net_direction = 'left' if avg_offset < 0 else 'right'
         else:
             net_direction = 'straight'
         
-        # If indicator is active, verify coherence
+        # If indicator is active, verify coherence with actual movement
         if indicator in ('left', 'right'):
-            # Check if net movement matches indicator
             if net_direction != 'straight' and net_direction != indicator:
-                # Incoherent: indicator says X but net movement is Y
                 return net_direction
             else:
-                # Coherent: return the indicator
                 return indicator
         
-        # No indicator: return net direction from position
         return net_direction
 
     def has_right_of_way(self) -> bool:
@@ -362,7 +364,7 @@ class DataBinder:
 
             # LANE_KEEPING
             'abs_lane_deviation': self.get_abs_lane_deviation,
-            'line_continuous': lambda: self.get_indicator_state() is None and lane_marking() == 'continuous',
+            'line_continuous': lambda: lane_marking() == 'continuous',
             'line_dashed': lambda: lane_marking() == 'dashed',
             'indicator':          self.get_indicator_state,
             'direction':          self.get_steering_direction,

@@ -20,7 +20,7 @@ state_machine:
     condition: line_continuous
   - from: idle_continous
     to: warning
-    condition: abs_lane_deviation > warning_threshold
+    condition: abs_lane_deviation > warning_threshold and (indicator == None or indicator != direction)
   - from: idle_dashed
     to: warning
     condition: abs_lane_deviation > warning_threshold and indicator == None
