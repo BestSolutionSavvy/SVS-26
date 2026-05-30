@@ -1,5 +1,6 @@
 from models.rule import Rule
 from models.state import State
+from carla_bindings import LazyDict
 
 
 class StateMachine:
@@ -18,24 +19,17 @@ class StateMachine:
     def __repr__(self) -> str:
         return f"StateMachine(rule={self._rule}, current_state={self._current_state})"
 
-    def evaluate(self, data: dict) -> State:
+    def evaluate(self, data: LazyDict) -> State:
         """
         Evaluate the current state based on the input data and update the state machine.
 
         Args:
             data: A dictionary of input data that may affect the state transitions
         """
-        # Preserve LazyDict if data is one by merging at the resolver level
-        from carla_bindings import LazyDict
         
-        if isinstance(data, LazyDict):
-            # Create a new LazyDict with both constants and original resolvers
-            merged_resolvers = {**self._rule.constants, **data._resolvers}
-            merged = LazyDict(merged_resolvers)
-            merged.update(data)  # Add already-computed values
-        else:
-            # Fallback for regular dicts
-            merged = {**self._rule.constants, **data}
+        merged_resolvers = {**self._rule.constants, **data._resolvers}
+        merged = LazyDict(merged_resolvers)
+        merged.update(data)  # Add already-computed values
         
         for transition in self._rule.transitions_from(self._current_state):
             if transition.verify(merged):
@@ -57,9 +51,11 @@ def test_sm():
         ])
     sm = StateMachine(dummy_rule)
     print(sm)
-    sm.evaluate({'value': 11})
+    sm.evaluate(LazyDict({'value': 11}))
     print(sm)
-    sm.evaluate({'value': 9})
+    sm.evaluate(LazyDict({'value': 9}))
     print(sm)
 
     
+if __name__ == "__main__":
+    test_sm()
