@@ -38,14 +38,3 @@ class Transition:
 
     def __repr__(self) -> str:
         return f"Transition(condition='{self._condition}', source={self.source.name}, target={self.target.name})"
-
-
-if __name__ == "__main__":
-    idle_state = State("idle")
-    warning_state = State("warning")
-    
-    transition = Transition("speed > 100", idle_state, warning_state)
-    
-    print(transition)
-    print(transition.verify(LazyDict({'speed': 120})))  # Should return True
-    print(transition.verify(LazyDict({'speed': 80})))   # Should return False 

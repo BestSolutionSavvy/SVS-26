@@ -1,8 +1,4 @@
 import pygame
-import sys
-import threading
-from datetime import datetime
-from typing import List, Tuple
 from view.hud_drawer import HudDrawer, Notification
 from models.state import StateType
 
@@ -12,8 +8,8 @@ FPS = 30
 
 
 class MockPygameDisplay:
-    """Mock di PygameDisplay per testare HudDrawer senza CARLA."""
-    
+    """A simple display wrapper for running the HUD demo."""
+
     def __init__(self, width=WIDTH, height=HEIGHT):
         self.width = width
         self.height = height
@@ -21,18 +17,16 @@ class MockPygameDisplay:
         self.running = True
         self.clock = None
         self.pressed_keys = []
-    
+
     def start(self):
-        """Inizializza pygame."""
         pygame.init()
         self._screen = pygame.display.set_mode((self.width, self.height))
-        pygame.display.set_caption("HudDrawer Test (Press 'W' for WARNING, 'V' for VIOLATION)")
+        pygame.display.set_caption(
+            "HudDrawer Demo (Press 'W' for WARNING, 'V' for VIOLATION)")
         self.clock = pygame.time.Clock()
-    
+
     def tick(self):
-        """Gestisce gli eventi e ritorna True se il programma deve continuare."""
         self.pressed_keys = []
-        
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
@@ -40,53 +34,31 @@ class MockPygameDisplay:
                 if event.key in (pygame.K_q, pygame.K_ESCAPE):
                     self.running = False
                 else:
-                    # Traccia i tasti premuti
                     self.pressed_keys.append(event.key)
-        
-        # Riempie lo schermo con colore grigio
         self._screen.fill((40, 40, 40))
         self.clock.tick(FPS)
-        
         return self.running
-    
+
     def destroy(self):
-        """Pulisce pygame."""
         pygame.quit()
 
 
-def main():
-    """Main function per testare HudDrawer senza connessione a CARLA."""
-    
-    # Crea il mock display
+def hud_demo():
     display = MockPygameDisplay(WIDTH, HEIGHT)
     display.start()
-    
-    # Crea l'HUD drawer
     hud = HudDrawer(display)
-    
+
     try:
         while display.tick():
-            # Controlla i tasti premuti per generare notifiche
             if pygame.K_w in display.pressed_keys:
-                notif = Notification(
-                    "Lane Keeping",
-                    StateType.WARNING,
-                    duration=3.0
-                )
-                hud.notify(notif)
-            
+                hud.notify(Notification("Lane Keeping",
+                           StateType.WARNING, duration=3.0))
             if pygame.K_v in display.pressed_keys:
-                notif = Notification(
-                    "Lane Keeping",
-                    StateType.VIOLATION,
-                    duration=3.0
-                )
-                hud.notify(notif)
-            
-            # Disegna le notifiche
+                hud.notify(Notification("Lane Keeping",
+                           StateType.VIOLATION, duration=3.0))
             hud._draw_notifications()
             pygame.display.flip()
-    
+
     except KeyboardInterrupt:
         print("\n\nInterrupted by user")
     finally:
@@ -94,4 +66,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    hud_demo()

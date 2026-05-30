@@ -36,26 +36,3 @@ class StateMachine:
                 self._current_state = transition.target
                 break
         return self._current_state
-
-
-def test_sm():
-    from models.transition import Transition
-    warning_state = State("warning")
-    idle_state = State("idle")
-    dummy_rule = Rule(
-        name="Dummy Rule",
-        constants={"threshold": 10},
-        transitions=[
-            Transition(condition="value > threshold", source=idle_state, target=warning_state),
-            Transition(condition="value <= threshold", source=warning_state, target=idle_state),
-        ])
-    sm = StateMachine(dummy_rule)
-    print(sm)
-    sm.evaluate(LazyDict({'value': 11}))
-    print(sm)
-    sm.evaluate(LazyDict({'value': 9}))
-    print(sm)
-
-    
-if __name__ == "__main__":
-    test_sm()

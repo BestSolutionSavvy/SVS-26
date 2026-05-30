@@ -221,3 +221,6 @@ __marimo__/
 
 # logs
 logs/
+
+# dummy package for testing
+carla.py
