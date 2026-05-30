@@ -25,9 +25,20 @@ class StateMachine:
         Args:
             data: A dictionary of input data that may affect the state transitions
         """
-        data = {**self._rule.constants, **data}
+        # Preserve LazyDict if data is one by merging at the resolver level
+        from carla_bindings import LazyDict
+        
+        if isinstance(data, LazyDict):
+            # Create a new LazyDict with both constants and original resolvers
+            merged_resolvers = {**self._rule.constants, **data._resolvers}
+            merged = LazyDict(merged_resolvers)
+            merged.update(data)  # Add already-computed values
+        else:
+            # Fallback for regular dicts
+            merged = {**self._rule.constants, **data}
+        
         for transition in self._rule.transitions_from(self._current_state):
-            if transition.verify(data):
+            if transition.verify(merged):
                 self._current_state = transition.target
                 break
         return self._current_state

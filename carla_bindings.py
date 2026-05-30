@@ -10,8 +10,9 @@ class LazyDict(dict):
     def __missing__(self, key):
         if key not in self._resolvers:
             raise KeyError(key)
-        print(f"  → calcolo '{key}'")
-        value = self._resolvers[key]()
+        resolver = self._resolvers[key]
+        # If it's callable, call it; otherwise use the value directly
+        value = resolver() if callable(resolver) else resolver
         self[key] = value
         return value
 
