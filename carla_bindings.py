@@ -1,5 +1,6 @@
 import carla
 from typing import Dict, Any, Optional
+from collections import deque
 
 
 class LazyDict(dict):
@@ -30,6 +31,8 @@ class DataBinder:
 
         self._vehicle_ahead = None
         self._sign_ahead = None
+        self._last_lateral_offset = 0.0
+        self._offset_history = deque(maxlen=30)  # Rolling window of last 30 lateral offsets
 
     # --- Dynamic variables ---
 
@@ -191,10 +194,29 @@ class DataBinder:
         ego_loc = self.get_ego_location()
         try:
             waypoint = self.map_obj.get_waypoint(ego_loc, project_to_road=True)
-            if waypoint.right_lane_marking.type == carla.LaneMarkingType.Solid:
+            marking_type = waypoint.right_lane_marking.type
+            
+            # Solid types = continuous line
+            if marking_type == carla.LaneMarkingType.Solid:
                 return 'continuous'
-            elif waypoint.right_lane_marking.type == carla.LaneMarkingType.Dashed:
+            # Broken and mixed types = dashed line
+            elif marking_type in (carla.LaneMarkingType.Broken, 
+                                 carla.LaneMarkingType.BrokenSolid,
+                                 carla.LaneMarkingType.SolidBroken,
+                                 carla.LaneMarkingType.BrokenBroken):
                 return 'dashed'
+            # If right marking is unavailable, try left marking
+            elif marking_type == carla.LaneMarkingType.NONE:
+                left_marking = waypoint.left_lane_marking.type
+                if left_marking == carla.LaneMarkingType.Solid:
+                    return 'continuous'
+                elif left_marking in (carla.LaneMarkingType.Broken,
+                                     carla.LaneMarkingType.BrokenSolid,
+                                     carla.LaneMarkingType.SolidBroken,
+                                     carla.LaneMarkingType.BrokenBroken):
+                    return 'dashed'
+                else:
+                    return 'unknown'
             else:
                 return 'unknown'
         except:
@@ -212,13 +234,54 @@ class DataBinder:
         return None
 
     def get_steering_direction(self) -> str:
-        """Returns 'left', 'right', or 'straight'."""
-        steer = self.ego_vehicle.get_control().steer
-        if steer < -0.1:
-            return 'left'
-        elif steer > 0.1:
-            return 'right'
-        return 'straight'
+        """Returns 'left', 'right', or 'straight'.
+        
+        ROLLING ACCUMULATION APPROACH:
+        - Maintain a rolling window of last 30 lateral offsets
+        - Calculate net (accumulated) movement direction
+        - If indicator is active, verify movement matches indicator
+        - Allows smooth lane changes (oscillations) but catches opposite movements
+        """
+        indicator = self.get_indicator_state()
+        
+        ego_loc = self.get_ego_location()
+        current_offset = 0.0
+        
+        try:
+            waypoint = self.map_obj.get_waypoint(ego_loc, project_to_road=True)
+            rel_vec = ego_loc - waypoint.transform.location
+            right_vec = waypoint.transform.get_right_vector()
+            current_offset = rel_vec.x * right_vec.x + rel_vec.y * right_vec.y
+        except:
+            pass
+        
+        # Add current offset to rolling history
+        self._offset_history.append(current_offset)
+        self._last_lateral_offset = current_offset
+        
+        # Calculate accumulated (net) movement over rolling window
+        accumulated = sum(self._offset_history) if self._offset_history else 0.0
+        window_size = len(self._offset_history)
+        avg_offset = accumulated / window_size if window_size > 0 else 0.0
+        
+        # Determine direction from net movement (with hysteresis: 0.05m threshold)
+        if abs(avg_offset) > 0.05:
+            net_direction = 'left' if avg_offset < 0 else 'right'
+        else:
+            net_direction = 'straight'
+        
+        # If indicator is active, verify coherence
+        if indicator in ('left', 'right'):
+            # Check if net movement matches indicator
+            if net_direction != 'straight' and net_direction != indicator:
+                # Incoherent: indicator says X but net movement is Y
+                return net_direction
+            else:
+                # Coherent: return the indicator
+                return indicator
+        
+        # No indicator: return net direction from position
+        return net_direction
 
     def has_right_of_way(self) -> bool:
         """Placeholder — always True until rule logic is implemented."""
@@ -299,7 +362,7 @@ class DataBinder:
 
             # LANE_KEEPING
             'abs_lane_deviation': self.get_abs_lane_deviation,
-            'line_continuous': lambda: lane_marking() == 'continuous',
+            'line_continuous': lambda: self.get_indicator_state() is None and lane_marking() == 'continuous',
             'line_dashed': lambda: lane_marking() == 'dashed',
             'indicator':          self.get_indicator_state,
             'direction':          self.get_steering_direction,

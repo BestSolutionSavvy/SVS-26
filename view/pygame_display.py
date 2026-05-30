@@ -120,10 +120,22 @@ class PygameDisplay:
             self.current_lights ^= int(carla.VehicleLightState.RightBlinker)
             self.ego_vehicle.set_light_state(carla.VehicleLightState(self.current_lights))
         elif button == 4:   # paddle sx -> left blinker indicator
-            self.current_lights ^= int(carla.VehicleLightState.LeftBlinker)
+            if self.current_lights & int(carla.VehicleLightState.LeftBlinker):
+                # LeftBlinker is on, toggle it off
+                self.current_lights &= ~int(carla.VehicleLightState.LeftBlinker)
+            else:
+                # LeftBlinker is off, turn it on and turn off RightBlinker
+                self.current_lights &= ~int(carla.VehicleLightState.RightBlinker)
+                self.current_lights |= int(carla.VehicleLightState.LeftBlinker)
             self.ego_vehicle.set_light_state(carla.VehicleLightState(self.current_lights))
         elif button == 5:   # paddle dx -> right blinker indicator
-            self.current_lights ^= int(carla.VehicleLightState.RightBlinker)
+            if self.current_lights & int(carla.VehicleLightState.RightBlinker):
+                # RightBlinker is on, toggle it off
+                self.current_lights &= ~int(carla.VehicleLightState.RightBlinker)
+            else:
+                # RightBlinker is off, turn it on and turn off LeftBlinker
+                self.current_lights &= ~int(carla.VehicleLightState.LeftBlinker)
+                self.current_lights |= int(carla.VehicleLightState.RightBlinker)
             self.ego_vehicle.set_light_state(carla.VehicleLightState(self.current_lights))
     
     def _render(self):
