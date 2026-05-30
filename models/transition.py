@@ -1,3 +1,5 @@
+from carla_bindings import LazyDict
+
 from .state import State
 
 
@@ -22,7 +24,7 @@ class Transition:
         """Get the condition (read-only)."""
         return self._condition
     
-    def verify(self, data: dict) -> bool:
+    def verify(self, data: LazyDict) -> bool:
         """
         Verify if the transition can occur based on the provided data.
         
@@ -33,11 +35,11 @@ class Transition:
             True if verification passes, False otherwise
         """
         return eval(self._condition, {}, data)
-    
+
     def __repr__(self) -> str:
         return f"Transition(condition='{self._condition}', source={self.source.name}, target={self.target.name})"
 
-"""
+
 if __name__ == "__main__":
     idle_state = State("idle")
     warning_state = State("warning")
@@ -45,5 +47,5 @@ if __name__ == "__main__":
     transition = Transition("speed > 100", idle_state, warning_state)
     
     print(transition)
-    print(transition.verify({'speed': 120}))  # Should return True
-    print(transition.verify({'speed': 80}))   # Should return False """
+    print(transition.verify(LazyDict({'speed': 120})))  # Should return True
+    print(transition.verify(LazyDict({'speed': 80})))   # Should return False 
