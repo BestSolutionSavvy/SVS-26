@@ -3,6 +3,9 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+from models.rule import Rule
+from models.transition import Transition
+
 
 class ViolationLogger:
     """Handles logging of rule violations to a JSON file with buffering."""
@@ -17,18 +20,18 @@ class ViolationLogger:
         """
         Path(log_dir).mkdir(exist_ok=True)
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        self.log_file = os.path.join(log_dir, f"violations_{timestamp}.jsonl")
+        self.log_file = os.path.join(log_dir, f"violations_{timestamp}.json")
         self.buffer = []
         self.buffer_size = buffer_size
 
-    def log_violation(self, rule_name: str, frame_count: int, scene_data: dict) -> None:
+    def log_violation(self, rule: Rule, transition: Transition | None, scene_data: dict) -> None:
         """
         Log a rule violation (buffered).
         
         Args:
-            rule_name: Name of the violated rule
-            frame_count: Frame number when violation occurred
-            scene_data: Data describing the scene when the violation occurred
+            rule: The Rule that was violated
+            transition: The Transition that represents the violation
+            scene_data: A dictionary of relevant scene data at the time of violation
         """
         scene_data_serializable = {
             k: str(v) if hasattr(v, '__dict__') else v
@@ -36,10 +39,10 @@ class ViolationLogger:
         }
         
         entry = {
-            "rule": rule_name,
-            "frame": frame_count,
+            "rule": str(rule),
+            "timestamp": datetime.now().strftime('%Y%m%d_%H:%M:%S.%f')[:-3],
+            "violation": str(transition),
             "scene": scene_data_serializable,
-            "timestamp": datetime.now().strftime('%H:%M:%S.%f')[:-3]
         }
         
         self.buffer.append(entry)

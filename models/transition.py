@@ -37,4 +37,4 @@ class Transition:
         return eval(self._condition, {}, data)
 
     def __repr__(self) -> str:
-        return f"Transition(condition='{self._condition}', source={self.source.name}, target={self.target.name})"
+        return f"Transition({self.source.name} ---({self._condition})--> {self.target.name})"

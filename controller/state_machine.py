@@ -1,6 +1,7 @@
 from models.rule import Rule
 from models.state import State
 from carla_bindings import LazyDict
+from models.transition import Transition
 
 
 class StateMachine:
@@ -17,22 +18,26 @@ class StateMachine:
         self._current_state = rule.initial_state
 
     def __repr__(self) -> str:
-        return f"StateMachine(rule={self._rule}, current_state={self._current_state})"
+        return f"StateMachine(rule={self._rule.name}, current_state={self._current_state})"
 
-    def evaluate(self, data: LazyDict) -> State:
+    def evaluate(self, data: LazyDict) -> tuple[State, Transition | None]:
         """
         Evaluate the current state based on the input data and update the state machine.
 
         Args:
             data: A dictionary of input data that may affect the state transitions
+        Returns:
+            A tuple of the new current state and the transition taken (if any)
         """
         
         merged_resolvers = {**self._rule.constants, **data._resolvers}
         merged = LazyDict(merged_resolvers)
-        merged.update(data)  # Add already-computed values
+        merged.update(data)
         
+        last_transition = None
         for transition in self._rule.transitions_from(self._current_state):
             if transition.verify(merged):
                 self._current_state = transition.target
+                last_transition = transition
                 break
-        return self._current_state
+        return self._current_state, last_transition
