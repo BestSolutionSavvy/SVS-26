@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 from models.rule import Rule
 from models.state import State
 from carla_bindings import LazyDict
 from models.transition import Transition
+from typing import Optional
 
 
 class StateMachine:
@@ -20,7 +23,7 @@ class StateMachine:
     def __repr__(self) -> str:
         return f"StateMachine(rule={self._rule.name}, current_state={self._current_state})"
 
-    def evaluate(self, data: LazyDict) -> tuple[State, Transition | None]:
+    def evaluate(self, data: LazyDict) -> tuple[State, Optional[Transition]]:
         """
         Evaluate the current state based on the input data and update the state machine.
 

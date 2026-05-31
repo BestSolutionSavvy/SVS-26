@@ -2,6 +2,7 @@ import json
 import os
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 from models.rule import Rule
 from models.transition import Transition
@@ -24,7 +25,7 @@ class ViolationLogger:
         self.buffer = []
         self.buffer_size = buffer_size
 
-    def log_violation(self, rule: Rule, transition: Transition | None, scene_data: dict) -> None:
+    def log_violation(self, rule: Rule, transition: Optional[Transition], scene_data: dict) -> None:
         """
         Log a rule violation (buffered).
         
