@@ -3,6 +3,7 @@ metadata:
   constants:
     warning_threshold: 0.4
     violation_threshold: 0.7
+    authorized_max_deviation: 1.8
 state_machine:
   direction: TB
   initial_state: idle
@@ -11,28 +12,47 @@ state_machine:
   - idle_continous
   - warning
   - idle_dashed
+  - maneuver_in_progress
   - violation
   transitions:
   - from: '[*]'
     to: idle
   - from: idle
     to: idle_continous
-    condition: line_continuous
-  - from: idle_continous
-    to: warning
-    condition: abs_lane_deviation > warning_threshold and (indicator == None or indicator != direction)
-  - from: idle_dashed
-    to: warning
-    condition: abs_lane_deviation > warning_threshold and indicator == None
+    condition: line_continuous and not authorized_maneuver
   - from: idle
     to: idle_dashed
     condition: line_dashed
   - from: idle_continous
     to: idle
-    condition: line_dashed
+    condition: line_dashed and not authorized_maneuver
   - from: idle_dashed
     to: idle
-    condition: line_continuous
+    condition: line_continuous and not authorized_maneuver
+  - from: idle_continous
+    to: maneuver_in_progress
+    condition: authorized_maneuver
+  - from: idle_dashed
+    to: maneuver_in_progress
+    condition: authorized_maneuver
+  - from: maneuver_in_progress
+    to: idle
+    condition: not authorized_maneuver and abs_lane_deviation <= warning_threshold
+  - from: maneuver_in_progress
+    to: idle_continous
+    condition: not authorized_maneuver and line_continuous and abs_lane_deviation <= warning_threshold
+  - from: maneuver_in_progress
+    to: idle_dashed
+    condition: not authorized_maneuver and line_dashed and abs_lane_deviation <= warning_threshold
+  - from: maneuver_in_progress
+    to: warning
+    condition: not authorized_maneuver and abs_lane_deviation > warning_threshold
+  - from: idle_continous
+    to: warning
+    condition: abs_lane_deviation > warning_threshold and (indicator == None or indicator != direction) and not authorized_maneuver
+  - from: idle_dashed
+    to: warning
+    condition: abs_lane_deviation > warning_threshold and indicator == None and not authorized_maneuver
   - from: warning
     to: idle_dashed
     condition: line_dashed and (indicator == direction or abs_lane_deviation <= warning_threshold)
@@ -41,7 +61,10 @@ state_machine:
     condition: line_continuous and abs_lane_deviation <= warning_threshold
   - from: warning
     to: violation
-    condition: abs_lane_deviation > violation_threshold
+    condition: abs_lane_deviation > violation_threshold and not authorized_maneuver
+  - from: violation
+    to: warning
+    condition: abs_lane_deviation <= violation_threshold and abs_lane_deviation > warning_threshold
   - from: violation
     to: idle
     condition: abs_lane_deviation <= warning_threshold

@@ -25,9 +25,7 @@ class DataBinder:
         self.world = world
         self.ego_vehicle = ego_vehicle
         self.map_obj = world.get_map()          # cached: never changes at runtime
-        self.all_vehicles = list(world.get_actors().filter(
-            "vehicle.*"))  # cached: spawned once
-        self.stop_signs = list(world.get_actors().filter("traffic.stop"))
+        # NOTE: stop_signs is NOT cached - we fetch live in get_distance_to_sign()
 
         self._vehicle_ahead = None
         self._sign_ahead = None
@@ -49,6 +47,7 @@ class DataBinder:
 
     def get_distance_to_sign(self, sign_type: str = "stop") -> float:
         """Distance to the nearest sign ahead on the same lane.
+        Uses LIVE sign list (not cached).
 
         Returns:
             - Positive: sign is ahead of ego (before waypoint)
@@ -59,8 +58,14 @@ class DataBinder:
         ego_loc = ego_tf.location
         ego_fwd = ego_tf.get_forward_vector()
 
-        signs = self.stop_signs if sign_type == "stop" else list(
-            self.world.get_actors().filter(f"traffic.{sign_type}"))
+        # LIVE sign list (not cached)
+        try:
+            if sign_type == "stop":
+                signs = list(self.world.get_actors().filter("traffic.stop"))
+            else:
+                signs = list(self.world.get_actors().filter(f"traffic.{sign_type}"))
+        except:
+            return float('inf')
 
         # Get ego's current lane
         try:
@@ -237,11 +242,13 @@ class DataBinder:
     def get_steering_direction(self) -> str:
         """Returns 'left', 'right', or 'straight'.
         
-        ROLLING ACCUMULATION APPROACH:
-        - Maintain a rolling window of last 30 lateral offsets
-        - Calculate net (accumulated) movement direction
-        - If indicator is active, verify movement matches indicator
-        - Resets accumulation when indicator changes to avoid contamination
+        ROLLING ACCUMULATION APPROACH v2 (IMPROVED):
+        - Maintain rolling window of lateral offsets (max 60 frames)
+        - Use weighted average: recent frames weighted 2x (exponential decay)
+        - Dynamic threshold based on speed: faster → higher threshold
+        - Outlier filtering: remove spikes > 2m or < -2m
+        - If indicator active: return indicator if movement is coherent, else return actual movement
+        - Resets accumulation when indicator changes
         """
         indicator = self.get_indicator_state()
         
@@ -251,6 +258,7 @@ class DataBinder:
             self._last_indicator = indicator
         
         ego_loc = self.get_ego_location()
+        ego_speed = self.get_ego_speed()
         current_offset = 0.0
         
         try:
@@ -261,52 +269,135 @@ class DataBinder:
         except:
             pass
         
-        # Add current offset to rolling history
-        self._offset_history.append(current_offset)
+        # IMPROVEMENT 1: Outlier filtering (remove spikes > |2.0|m)
+        if abs(current_offset) <= 2.0:
+            self._offset_history.append(current_offset)
+        else:
+            # Skip outlier but keep last valid value
+            if self._offset_history:
+                self._offset_history.append(self._offset_history[-1])
+        
         self._last_lateral_offset = current_offset
         
-        # Calculate accumulated net movement over rolling window
-        accumulated = sum(self._offset_history) if self._offset_history else 0.0
-        window_size = len(self._offset_history)
-        avg_offset = accumulated / window_size if window_size > 0 else 0.0
+        # IMPROVEMENT 2: Weighted average (recent frames have 2x weight)
+        # Exponential decay: weight = 1 + (idx / window_size)
+        if self._offset_history:
+            weighted_sum = 0.0
+            weight_sum = 0.0
+            window_size = len(self._offset_history)
+            for idx, offset in enumerate(self._offset_history):
+                weight = 1.0 + (idx / window_size)  # Recent frames = higher weight
+                weighted_sum += offset * weight
+                weight_sum += weight
+            weighted_avg = weighted_sum / weight_sum if weight_sum > 0 else 0.0
+        else:
+            weighted_avg = 0.0
         
-        # Determine direction from net movement (threshold: 0.01m)
-        if abs(avg_offset) > 0.01:
-            net_direction = 'left' if avg_offset < 0 else 'right'
+        # IMPROVEMENT 3: Dynamic threshold based on speed
+        # Slower speeds = lower threshold (more precision needed)
+        # Faster speeds = higher threshold (allow natural steering variation)
+        if ego_speed < 5.0:
+            direction_threshold = 0.08  # 8cm at low speed
+        elif ego_speed < 15.0:
+            direction_threshold = 0.15  # 15cm at medium speed
+        else:
+            direction_threshold = 0.25  # 25cm at high speed
+        
+        # Determine direction from weighted movement
+        if abs(weighted_avg) > direction_threshold:
+            net_direction = 'left' if weighted_avg < 0 else 'right'
         else:
             net_direction = 'straight'
         
-        # If indicator is active, verify coherence with actual movement
+        # IMPROVEMENT 4: Coherence check
+        # If indicator active: return indicator IF coherent with actual movement
+        # "Coherent" = movement is either straight OR matches indicator direction
         if indicator in ('left', 'right'):
+            # If actual movement is opposite to indicator, report actual movement (driver incoherence)
+            # Otherwise, trust indicator
             if net_direction != 'straight' and net_direction != indicator:
+                # Driver said left but moving right = report actual (right)
                 return net_direction
             else:
+                # Driver said left and moving left/straight = return indicator (left)
                 return indicator
         
         return net_direction
 
     def has_right_of_way(self) -> bool:
-        """Placeholder — always True until rule logic is implemented."""
+        """Determine if ego has right-of-way based on traffic rules and vehicle positions.
+        
+        Rules:
+        - If broad_right_occupied: Vehicle on right has priority → precedence = False
+        - If approaching stop sign (distance < 30m): No precedence until fully stopped
+        - Otherwise: Has right of way → precedence = True
+        """
+        # Check for vehicles on the right (broad range = general intersection check)
+        if self.is_vehicle_on_right(narrow=False):
+            # Vehicle coming from right = they have priority
+            return False
+        
+        # Check for stop signs (if approaching, no automatic precedence)
+        distance_to_stop = self.get_distance_to_sign(sign_type="stop")
+        if distance_to_stop > 0 and distance_to_stop < 30.0:
+            # Approaching stop sign: Only has precedence after full stop
+            ego_speed = self.get_ego_speed()
+            if ego_speed > 0.5:
+                return False
+        
+        # Default: has right of way
         return True
+
+    def is_authorized_lane_change(self) -> bool:
+        """Returns True if driver is actively performing an AUTHORIZED lane change.
+        Authorized = indicator is active AND steering direction matches (or just started).
+        
+        This allows the system to tolerate line_marking changes and higher deviations
+        during a legitimate lane change maneuver.
+        """
+        indicator = self.get_indicator_state()
+        direction = self.get_steering_direction()
+        
+        # Authorized if indicator matches direction OR direction is 'straight' but indicator active (maneuver just started)
+        if indicator in ('left', 'right'):
+            return direction in (indicator, 'straight')
+        return False
 
     def is_vehicle_on_right(self, narrow: bool = False) -> bool:
         """Check if any vehicle is on the right of the ego path.
-        narrow=True uses tighter detection ranges for intersection checks."""
+        Uses LIVE vehicle list (not cached).
+        narrow=True uses tighter detection ranges for intersection checks.
+        
+        Detection logic:
+        - Vehicles ahead (0 < fwd_dist < fwd_range)
+        - AND on the right side (0 < right_dist < right_range)
+        """
         ego_tf = self.ego_vehicle.get_transform()
         ego_loc = ego_tf.location
         ego_fwd = ego_tf.get_forward_vector()
         right_vec = ego_tf.get_right_vector()
+        
         fwd_range = 15.0 if narrow else 30.0
         right_range = 1.5 if narrow else 3.0
-        for v in self.all_vehicles:
+        
+        # LIVE vehicle list (not cached)
+        try:
+            current_vehicles = list(self.world.get_actors().filter("vehicle.*"))
+        except:
+            return False
+        
+        for v in current_vehicles:
             if v.id == self.ego_vehicle.id:
                 continue
-            rel_vec = v.get_transform().location - ego_loc
-            fwd_dist = rel_vec.x * ego_fwd.x + rel_vec.y * ego_fwd.y
-            if 0 < fwd_dist < fwd_range:
-                right_dist = rel_vec.x * right_vec.x + rel_vec.y * right_vec.y
-                if 0 < right_dist < right_range:
-                    return True
+            try:
+                rel_vec = v.get_transform().location - ego_loc
+                fwd_dist = rel_vec.x * ego_fwd.x + rel_vec.y * ego_fwd.y
+                if 0 < fwd_dist < fwd_range:
+                    right_dist = rel_vec.x * right_vec.x + rel_vec.y * right_vec.y
+                    if 0 < right_dist < right_range:
+                        return True
+            except:
+                continue
         return False
 
     def _calculate_safe_thresholds(self) -> Dict[str, float]:
@@ -368,5 +459,6 @@ class DataBinder:
             'line_dashed': lambda: lane_marking() == 'dashed',
             'indicator':          self.get_indicator_state,
             'direction':          self.get_steering_direction,
+            'authorized_maneuver': self.is_authorized_lane_change,
         }
         return LazyDict(resolvers)

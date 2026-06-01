@@ -30,6 +30,7 @@ class PygameDisplay:
         self._screen = None
         self._joystick = None
         self.current_lights = 0
+        self.hud_drawer = None
 
     @property
     def control(self):
@@ -38,7 +39,7 @@ class PygameDisplay:
     def start(self):
         pygame.init()
         pygame.joystick.init()
-        self._screen = pygame.display.set_mode((self.width, self.height))
+        self._screen = pygame.display.set_mode((self.width, self.height), pygame.RESIZABLE)
         
         # Force event polling to initialize XInput device
         pygame.event.pump()
@@ -73,6 +74,9 @@ class PygameDisplay:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
+            elif event.type == pygame.VIDEORESIZE:
+                self.width, self.height = event.size
+                self._screen = pygame.display.set_mode((self.width, self.height), pygame.RESIZABLE)
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r:
                     self.reverse = not self.reverse
@@ -141,7 +145,12 @@ class PygameDisplay:
     def _render(self):
         with self._surface_lock:
             if self._surface:
-                self._screen.blit(self._surface, (0, 0))
+                scaled_surface = pygame.transform.scale(self._surface, (self.width, self.height))
+                self._screen.blit(scaled_surface, (0, 0))
+        
+        if self.hud_drawer:
+            self.hud_drawer._draw_notifications()
+        
         pygame.display.flip()
 
     def destroy(self):
