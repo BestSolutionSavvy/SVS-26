@@ -30,7 +30,6 @@ class DataBinder:
         self._vehicle_ahead = None
         self._sign_ahead = None
         self._last_lateral_offset = 0.0
-        self._offset_history = deque(maxlen=30)  # Rolling window of last 30 lateral offsets
         self._last_indicator = None  # Track previous indicator to detect changes
 
     # --- Dynamic variables ---
@@ -176,14 +175,33 @@ class DataBinder:
         self._vehicle_ahead = best_vehicle
         return min_dist
 
-    def get_abs_lane_deviation(self) -> float:
-        """Lateral distance from lane center."""
+    def get_min_line_distance(self) -> float:
+        """Minimum lateral distance to the nearest lane marking (left or right).
+
+        Computes:
+            - right_dist: lateral distance from ego to the right lane boundary
+                          = lane_half_width - signed_offset  (offset positive = toward right)
+            - left_dist:  lateral distance from ego to the left lane boundary
+                          = lane_half_width + signed_offset  (offset negative = toward left)
+
+        Returns the smaller of the two, i.e. how close we are to the nearer line.
+        Returns 0.0 on failure.
+        """
         ego_loc = self.get_ego_location()
         try:
             waypoint = self.map_obj.get_waypoint(ego_loc, project_to_road=True)
             rel_vec = ego_loc - waypoint.transform.location
             right_vec = waypoint.transform.get_right_vector()
-            return abs(rel_vec.x * right_vec.x + rel_vec.y * right_vec.y)
+
+            # Signed lateral offset: positive = right of center, negative = left
+            signed_offset = rel_vec.x * right_vec.x + rel_vec.y * right_vec.y
+
+            half_width = waypoint.lane_width / 2.0
+
+            right_dist = half_width - signed_offset   # distance to right line
+            left_dist  = half_width + signed_offset   # distance to left line
+
+            return min(abs(right_dist), abs(left_dist))
         except:
             return 0.0
 
@@ -240,89 +258,17 @@ class DataBinder:
         return None
 
     def get_steering_direction(self) -> str:
-        """Returns 'left', 'right', or 'straight'.
-        
-        ROLLING ACCUMULATION APPROACH v2 (IMPROVED):
-        - Maintain rolling window of lateral offsets (max 60 frames)
-        - Use weighted average: recent frames weighted 2x (exponential decay)
-        - Dynamic threshold based on speed: faster → higher threshold
-        - Outlier filtering: remove spikes > 2m or < -2m
-        - If indicator active: return indicator if movement is coherent, else return actual movement
-        - Resets accumulation when indicator changes
+        """Returns 'left' or 'right' based on the current steering wheel input.
+
+        Uses the raw control steering value in [-1, 1]:
+            < 0  → 'left'
+            >= 0 → 'right'
+
+        The result is directly comparable with the indicator state
+        ('left' / 'right') returned by get_indicator_state().
         """
-        indicator = self.get_indicator_state()
-        
-        # Reset accumulation if indicator changed
-        if indicator != self._last_indicator:
-            self._offset_history.clear()
-            self._last_indicator = indicator
-        
-        ego_loc = self.get_ego_location()
-        ego_speed = self.get_ego_speed()
-        current_offset = 0.0
-        
-        try:
-            waypoint = self.map_obj.get_waypoint(ego_loc, project_to_road=True)
-            rel_vec = ego_loc - waypoint.transform.location
-            right_vec = waypoint.transform.get_right_vector()
-            current_offset = rel_vec.x * right_vec.x + rel_vec.y * right_vec.y
-        except:
-            pass
-        
-        # IMPROVEMENT 1: Outlier filtering (remove spikes > |2.0|m)
-        if abs(current_offset) <= 2.0:
-            self._offset_history.append(current_offset)
-        else:
-            # Skip outlier but keep last valid value
-            if self._offset_history:
-                self._offset_history.append(self._offset_history[-1])
-        
-        self._last_lateral_offset = current_offset
-        
-        # IMPROVEMENT 2: Weighted average (recent frames have 2x weight)
-        # Exponential decay: weight = 1 + (idx / window_size)
-        if self._offset_history:
-            weighted_sum = 0.0
-            weight_sum = 0.0
-            window_size = len(self._offset_history)
-            for idx, offset in enumerate(self._offset_history):
-                weight = 1.0 + (idx / window_size)  # Recent frames = higher weight
-                weighted_sum += offset * weight
-                weight_sum += weight
-            weighted_avg = weighted_sum / weight_sum if weight_sum > 0 else 0.0
-        else:
-            weighted_avg = 0.0
-        
-        # IMPROVEMENT 3: Dynamic threshold based on speed
-        # Slower speeds = lower threshold (more precision needed)
-        # Faster speeds = higher threshold (allow natural steering variation)
-        if ego_speed < 5.0:
-            direction_threshold = 0.08  # 8cm at low speed
-        elif ego_speed < 15.0:
-            direction_threshold = 0.15  # 15cm at medium speed
-        else:
-            direction_threshold = 0.25  # 25cm at high speed
-        
-        # Determine direction from weighted movement
-        if abs(weighted_avg) > direction_threshold:
-            net_direction = 'left' if weighted_avg < 0 else 'right'
-        else:
-            net_direction = 'straight'
-        
-        # IMPROVEMENT 4: Coherence check
-        # If indicator active: return indicator IF coherent with actual movement
-        # "Coherent" = movement is either straight OR matches indicator direction
-        if indicator in ('left', 'right'):
-            # If actual movement is opposite to indicator, report actual movement (driver incoherence)
-            # Otherwise, trust indicator
-            if net_direction != 'straight' and net_direction != indicator:
-                # Driver said left but moving right = report actual (right)
-                return net_direction
-            else:
-                # Driver said left and moving left/straight = return indicator (left)
-                return indicator
-        
-        return net_direction
+        control = self.ego_vehicle.get_control()
+        return 'left' if control.steer < 0 else 'right'
 
     def has_right_of_way(self) -> bool:
         """Determine if ego has right-of-way based on traffic rules and vehicle positions.
@@ -347,21 +293,6 @@ class DataBinder:
         
         # Default: has right of way
         return True
-
-    def is_authorized_lane_change(self) -> bool:
-        """Returns True if driver is actively performing an AUTHORIZED lane change.
-        Authorized = indicator is active AND steering direction matches (or just started).
-        
-        This allows the system to tolerate line_marking changes and higher deviations
-        during a legitimate lane change maneuver.
-        """
-        indicator = self.get_indicator_state()
-        direction = self.get_steering_direction()
-        
-        # Authorized if indicator matches direction OR direction is 'straight' but indicator active (maneuver just started)
-        if indicator in ('left', 'right'):
-            return direction in (indicator, 'straight')
-        return False
 
     def is_vehicle_on_right(self, narrow: bool = False) -> bool:
         """Check if any vehicle is on the right of the ego path.
@@ -454,11 +385,10 @@ class DataBinder:
             'narrow_right_occupied': lambda: self.is_vehicle_on_right(narrow=True),
 
             # LANE_KEEPING
-            'abs_lane_deviation': self.get_abs_lane_deviation,
+            'min_line_distance':  self.get_min_line_distance,
             'line_continuous': lambda: lane_marking() == 'continuous',
             'line_dashed': lambda: lane_marking() == 'dashed',
             'indicator':          self.get_indicator_state,
             'direction':          self.get_steering_direction,
-            'authorized_maneuver': self.is_authorized_lane_change,
         }
         return LazyDict(resolvers)

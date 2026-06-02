@@ -17,7 +17,7 @@ state_machine:
     to: idle
   - from: idle
     to: warning
-    condition: distance_to_sign <= warning_treshold and distance_to_sign > stop_threshold
+    condition: distance_to_sign <= warning_threshold and distance_to_sign > stop_threshold
   - from: warning
     to: stopped
     condition: ego_speed == 0.0 and distance_to_sign <= stop_threshold
