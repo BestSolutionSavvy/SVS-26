@@ -57,11 +57,17 @@ class HudDrawer:
 
         notifications.sort(key=lambda n: n.creation_time)
         
-        notification_height = 95
-        start_y = 100
-        
+        # Scale layout with window width (same ratio as BOX_W)
+        win_w = self.display.width
+        box_w = max(280, min(560, int(win_w * 0.28)))
+        layout_scale = box_w / 430
+
+        notification_height = int(95 * layout_scale)
+        gap                 = int(15 * layout_scale)
+        start_y             = int(100 * layout_scale)
+
         for i, notification in enumerate(notifications):
-            y = start_y + i * (notification_height + 15)
+            y = start_y + i * (notification_height + gap)
             if y + notification_height > self.display.height - 80:
                 break
             
@@ -75,26 +81,32 @@ class HudDrawer:
     def _draw_notification_box(self, notification: Notification, y: int, alpha: int):
         """Draws a single notification box"""
 
-        BOX_W   = 430
-        BOX_H   = 95
-        RADIUS  = 16
-        PAD_L   = 22         
-        ICON_SZ = 36        
-        TEXT_X  = PAD_L + ICON_SZ + 14
-        TITLE_Y = 13
-        SUB_Y   = 40
-        TIME_Y  = 63
+        # Box width scales with window: 28% of screen width, clamped to [280, 560]
+        win_w   = self.display.width
+        BOX_W   = max(280, min(560, int(win_w * 0.28)))
+        scale   = BOX_W / 430          # relative to the original 430px design
+        BOX_H   = int(95  * scale)
+        RADIUS  = max(8, int(16 * scale))
+        PAD_L   = max(12, int(22 * scale))
+        ICON_SZ = max(20, int(36 * scale))
+        TEXT_X  = PAD_L + ICON_SZ + max(8, int(14 * scale))
+        TITLE_Y = max(6,  int(13 * scale))
+        SUB_Y   = max(20, int(40 * scale))
+        TIME_Y  = max(34, int(63 * scale))
 
-        x = self.display.width - BOX_W - 20
+        x = win_w - BOX_W - 20
         is_violation = notification.type == StateType.VIOLATION
         accent = (220, 50, 50) if is_violation else (255, 175, 0)
 
-        if not hasattr(self, '_notif_fonts'):
+        # Rebuild fonts only when scale changes (avoids per-frame allocation)
+        font_key = round(scale, 2)
+        if not hasattr(self, '_notif_fonts') or getattr(self, '_notif_font_scale', None) != font_key:
+            self._notif_font_scale = font_key
             self._notif_fonts = {
-                'title': pygame.font.SysFont("arial", 20, bold=True),
-                'sub':   pygame.font.SysFont("arial", 13),
-                'time':  pygame.font.SysFont("arial", 13, bold=True),
-                'icon':  pygame.font.SysFont("arial", 22, bold=True),
+                'title': pygame.font.SysFont("arial", max(10, int(20 * scale)), bold=True),
+                'sub':   pygame.font.SysFont("arial", max(8,  int(13 * scale))),
+                'time':  pygame.font.SysFont("arial", max(8,  int(13 * scale)), bold=True),
+                'icon':  pygame.font.SysFont("arial", max(10, int(22 * scale)), bold=True),
             }
         fnt = self._notif_fonts
 

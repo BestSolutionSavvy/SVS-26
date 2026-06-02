@@ -8,16 +8,39 @@ import threading
 # Allow input detection in background/notebook environments
 os.environ["SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS"] = "1"
 
-WIDTH = 800
-HEIGHT = 600
+# Default window size (freely resizable at runtime)
+DEFAULT_WIDTH = 800
+DEFAULT_HEIGHT = 600
+
+# Internal camera render resolution (fixed — independent from window size)
+RENDER_WIDTH = 800
+RENDER_HEIGHT = 600
+
 
 class PygameDisplay:
-    def __init__(self, world, ego_vehicle, width=WIDTH, height=HEIGHT):
-        """Handles rendering the camera feed and processing user input for controlling the vehicle."""
+    def __init__(
+        self,
+        world,
+        ego_vehicle,
+        width: int = DEFAULT_WIDTH,
+        height: int = DEFAULT_HEIGHT,
+        render_width: int = RENDER_WIDTH,
+        render_height: int = RENDER_HEIGHT,
+    ):
+        """Handles rendering the camera feed and processing user input for controlling the vehicle.
+
+        Args:
+            width:         Initial window width in pixels (resizable at runtime).
+            height:        Initial window height in pixels (resizable at runtime).
+            render_width:  Camera sensor resolution width (fixed after start).
+            render_height: Camera sensor resolution height (fixed after start).
+        """
         self.world = world
         self.ego_vehicle = ego_vehicle
         self.width = width
         self.height = height
+        self._render_width = render_width
+        self._render_height = render_height
 
         self._surface = None
         self._surface_lock = threading.Lock()
@@ -48,8 +71,10 @@ class PygameDisplay:
             self._joystick.init()
 
         bp = self.world.get_blueprint_library().find("sensor.camera.rgb")
-        bp.set_attribute("image_size_x", str(self.width))
-        bp.set_attribute("image_size_y", str(self.height))
+        # Camera resolution is fixed at sensor level; the rendered surface is
+        # scaled to the current window size inside _render().
+        bp.set_attribute("image_size_x", str(self._render_width))
+        bp.set_attribute("image_size_y", str(self._render_height))
         bp.set_attribute("fov", "90")
 
         cam_transform = carla.Transform(carla.Location(x=-5.5, z=2.5), carla.Rotation(pitch=-10))
@@ -75,6 +100,8 @@ class PygameDisplay:
             if event.type == pygame.QUIT:
                 self.running = False
             elif event.type == pygame.VIDEORESIZE:
+                # On SDL2/pygame 2 the display is already resized automatically;
+                # we just update our bookkeeping so HUD and scaling stay correct.
                 self.width, self.height = event.size
                 self._screen = pygame.display.set_mode((self.width, self.height), pygame.RESIZABLE)
             elif event.type == pygame.KEYDOWN:
@@ -82,6 +109,11 @@ class PygameDisplay:
                     self.reverse = not self.reverse
                 elif event.key in (pygame.K_q, pygame.K_ESCAPE):
                     self.running = False
+                # Arrow keys → blinker control (keyboard-only; joystick uses paddles)
+                elif event.key == pygame.K_LEFT and not self._joystick:
+                    self._toggle_blinker(left=True)
+                elif event.key == pygame.K_RIGHT and not self._joystick:
+                    self._toggle_blinker(left=False)
             elif event.type == pygame.JOYBUTTONDOWN and self._joystick:
                 self._handle_joystick_button(event.button)
 
@@ -110,47 +142,65 @@ class PygameDisplay:
 
         self._control.reverse = self.reverse
 
+    def _toggle_blinker(self, left: bool):
+        """Toggle left or right blinker, turning off the opposite one if active.
+        
+        Shared by keyboard (arrow keys) and joystick (paddle buttons) so the
+        logic lives in a single place.
+        """
+        if left:
+            own_flag   = int(carla.VehicleLightState.LeftBlinker)
+            other_flag = int(carla.VehicleLightState.RightBlinker)
+        else:
+            own_flag   = int(carla.VehicleLightState.RightBlinker)
+            other_flag = int(carla.VehicleLightState.LeftBlinker)
+
+        if self.current_lights & own_flag:
+            # Already on → turn off
+            self.current_lights &= ~own_flag
+        else:
+            # Turn on and make sure the opposite is off
+            self.current_lights &= ~other_flag
+            self.current_lights |= own_flag
+
+        self.ego_vehicle.set_light_state(carla.VehicleLightState(self.current_lights))
+
     def _handle_joystick_button(self, button: int):
         """Handle joystick button presses for light control."""
-        if button == 0:     # A -> toggle reverse
+        if button == 0:     # A → toggle reverse
             self.reverse = not self.reverse
             if self.reverse:
                 self.current_lights |= int(carla.VehicleLightState.Reverse)
             else:
                 self.current_lights &= ~int(carla.VehicleLightState.Reverse)
             self.ego_vehicle.set_light_state(carla.VehicleLightState(self.current_lights))
-        elif button == 1:   # B -> hazard
+        elif button == 1:   # B → hazard (both blinkers)
             self.current_lights ^= int(carla.VehicleLightState.LeftBlinker)
             self.current_lights ^= int(carla.VehicleLightState.RightBlinker)
             self.ego_vehicle.set_light_state(carla.VehicleLightState(self.current_lights))
-        elif button == 4:   # paddle sx -> left blinker indicator
-            if self.current_lights & int(carla.VehicleLightState.LeftBlinker):
-                # LeftBlinker is on, toggle it off
-                self.current_lights &= ~int(carla.VehicleLightState.LeftBlinker)
-            else:
-                # LeftBlinker is off, turn it on and turn off RightBlinker
-                self.current_lights &= ~int(carla.VehicleLightState.RightBlinker)
-                self.current_lights |= int(carla.VehicleLightState.LeftBlinker)
-            self.ego_vehicle.set_light_state(carla.VehicleLightState(self.current_lights))
-        elif button == 5:   # paddle dx -> right blinker indicator
-            if self.current_lights & int(carla.VehicleLightState.RightBlinker):
-                # RightBlinker is on, toggle it off
-                self.current_lights &= ~int(carla.VehicleLightState.RightBlinker)
-            else:
-                # RightBlinker is off, turn it on and turn off LeftBlinker
-                self.current_lights &= ~int(carla.VehicleLightState.LeftBlinker)
-                self.current_lights |= int(carla.VehicleLightState.RightBlinker)
-            self.ego_vehicle.set_light_state(carla.VehicleLightState(self.current_lights))
+        elif button == 4:   # paddle sx → left blinker
+            self._toggle_blinker(left=True)
+        elif button == 5:   # paddle dx → right blinker
+            self._toggle_blinker(left=False)
     
     def _render(self):
+        self._screen.fill((0, 0, 0))  # letterbox background
+
         with self._surface_lock:
             if self._surface:
-                scaled_surface = pygame.transform.scale(self._surface, (self.width, self.height))
-                self._screen.blit(scaled_surface, (0, 0))
-        
+                src_w, src_h = self._surface.get_size()
+                # Scale preserving aspect ratio (letterbox / pillarbox)
+                scale = min(self.width / src_w, self.height / src_h)
+                dst_w = int(src_w * scale)
+                dst_h = int(src_h * scale)
+                offset_x = (self.width  - dst_w) // 2
+                offset_y = (self.height - dst_h) // 2
+                scaled_surface = pygame.transform.scale(self._surface, (dst_w, dst_h))
+                self._screen.blit(scaled_surface, (offset_x, offset_y))
+
         if self.hud_drawer:
             self.hud_drawer._draw_notifications()
-        
+
         pygame.display.flip()
 
     def destroy(self):
