@@ -94,6 +94,16 @@ class PygameDisplay:
         surface = pygame.surfarray.make_surface(array.swapaxes(0, 1))
         with self._surface_lock:
             self._surface = surface
+            
+    def _handle_reverse(self):
+        '''Toggle reverse gear and update light state accordingly.
+        '''
+        self.reverse = not self.reverse
+        if self.reverse:
+            self.current_lights |= int(carla.VehicleLightState.Reverse)
+        else:
+            self.current_lights &= ~int(carla.VehicleLightState.Reverse)
+        self.ego_vehicle.set_light_state(carla.VehicleLightState(self.current_lights))
 
     def tick(self):
         for event in pygame.event.get():
@@ -106,7 +116,7 @@ class PygameDisplay:
                 self._screen = pygame.display.set_mode((self.width, self.height), pygame.RESIZABLE)
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r:
-                    self.reverse = not self.reverse
+                    self._handle_reverse()
                 elif event.key in (pygame.K_q, pygame.K_ESCAPE):
                     self.running = False
                 # Arrow keys → blinker control (keyboard-only; joystick uses paddles)
@@ -168,12 +178,7 @@ class PygameDisplay:
     def _handle_joystick_button(self, button: int):
         """Handle joystick button presses for light control."""
         if button == 0:     # A → toggle reverse
-            self.reverse = not self.reverse
-            if self.reverse:
-                self.current_lights |= int(carla.VehicleLightState.Reverse)
-            else:
-                self.current_lights &= ~int(carla.VehicleLightState.Reverse)
-            self.ego_vehicle.set_light_state(carla.VehicleLightState(self.current_lights))
+           self._handle_reverse()
         elif button == 1:   # B → hazard (both blinkers)
             self.current_lights ^= int(carla.VehicleLightState.LeftBlinker)
             self.current_lights ^= int(carla.VehicleLightState.RightBlinker)
