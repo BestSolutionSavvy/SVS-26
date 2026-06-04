@@ -15,6 +15,10 @@ class LazyDict(dict):
         self[key] = value
         return value
 
+    def get_cached_dict(self) -> dict:
+        """Ritorna un dict normale con tutte le variabili già calcolate."""
+        return dict(self)
+
 
 class DataBinder:
     """Binds guard variables to CARLA world queries."""
