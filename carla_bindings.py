@@ -291,8 +291,8 @@ class DataBinder:
         ) else 1.0
 
         return {
-            'threshold_safe': ego_speed * 0.5  * multiplier,
-            'threshold_min':  ego_speed * 0.25 * multiplier,
+            'threshold_safe': max(1, ego_speed * 0.5  * multiplier),
+            'threshold_min':  max(1, ego_speed * 0.25 * multiplier),
         }
 
     # --- Scene data ---
