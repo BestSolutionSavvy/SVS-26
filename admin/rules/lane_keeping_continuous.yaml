@@ -1,0 +1,26 @@
+metadata:
+  title: lane_keeping_continuous
+  constants:
+    warning_threshold: 0.5
+state_machine:
+  direction: TB
+  initial_state: idle
+  states:
+  - idle
+  - warning
+  - violation
+  transitions:
+  - from: '[*]'
+    to: idle
+  - from: idle
+    to: warning
+    condition: min_line_distance < warning_threshold and line_continuous == True
+  - from: warning
+    to: idle
+    condition: min_line_distance >= warning_threshold  and line_continuous == True
+  - from: warning
+    to: violation
+    condition: min_line_distance <= 0.0 and line_continuous == True
+  - from: violation
+    to: idle
+    condition: min_line_distance > 0.0 and line_continuous == True

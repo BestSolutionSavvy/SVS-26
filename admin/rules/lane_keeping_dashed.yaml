@@ -1,0 +1,38 @@
+metadata:
+  title: lane_keeping_dashed
+  constants:
+    warning_threshold: 0.5
+state_machine:
+  direction: LR
+  initial_state: idle
+  states:
+  - idle
+  - warning
+  - lane_changing
+  - violation
+  transitions:
+  - from: '[*]'
+    to: idle
+  - from: idle
+    to: warning
+    condition: min_line_distance < warning_threshold and direction != indicator and
+      line_dashed == True
+  - from: idle
+    to: lane_changing
+    condition: direction == indicator and line_dashed == True
+  - from: warning
+    to: lane_changing
+    condition: direction == indicator and line_dashed == True
+  - from: lane_changing
+    to: idle
+    condition: direction == indicator and line_dashed == True
+  - from: warning
+    to: idle
+    condition: min_line_distance >= warning_threshold and direction != indicator and
+      line_dashed == True
+  - from: warning
+    to: violation
+    condition: min_line_distance <= 0.0 and line_dashed == True
+  - from: violation
+    to: idle
+    condition: min_line_distance > 0.0 and line_dashed == True

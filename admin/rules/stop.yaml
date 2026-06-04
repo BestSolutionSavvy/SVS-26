@@ -1,8 +1,8 @@
 metadata:
   title: Stop
   constants:
-    warning_treshold: 10
-    stop_treshold: 1
+    warning_threshold: 10
+    stop_threshold: 2
     stop_departure_speed: 0.5
 state_machine:
   direction: LR
@@ -17,16 +17,19 @@ state_machine:
     to: idle
   - from: idle
     to: warning
-    condition: distance_to_sign <= warning_treshold
+    condition: distance_to_sign <= warning_threshold and distance_to_sign > stop_threshold
   - from: warning
     to: stopped
-    condition: ego_speed == 0.0 and distance_to_sign <= stop_treshold
+    condition: ego_speed == 0.0 and distance_to_sign <= stop_threshold
   - from: stopped
     to: idle
     condition: ego_speed >= stop_departure_speed
   - from: warning
     to: violation
-    condition: ego_speed > 0.0 and distance_to_sign <= 0.5 and distance_to_sign >= -2
+    condition: ego_speed > 0.0 and distance_to_sign <= 0.0
+  - from: warning
+    to: idle
+    condition: distance_to_sign > warning_threshold
   - from: violation
     to: idle
-    condition: distance_to_sign > warning_treshold
+    condition: distance_to_sign > warning_threshold
