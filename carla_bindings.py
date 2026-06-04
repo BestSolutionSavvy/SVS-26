@@ -241,15 +241,54 @@ class DataBinder:
         return 'left' if control.steer < 0 else 'right'
 
     def has_right_of_way(self) -> bool:
-        """Returns False if a vehicle is on the right or ego is approaching a stop sign."""
-        if self.is_vehicle_on_right(narrow=False):
-            return False
-
-        distance_to_stop = self.get_distance_to_sign(sign_type="stop")
-        if 0 < distance_to_stop < 30.0 and self.get_ego_speed() > 0.5:
-            return False
-
-        return True
+        """
+        Returns True if ego has right of way:
+        - False if ego is facing a stop sign or red traffic light ahead
+        - True if no vehicles on the right
+        - True if vehicles on the right are constrained by stop signs or red lights
+        - False if vehicles on the right have no constraints
+        """
+        ego_loc = self.get_ego_location()
+        ego_tf = self.ego_vehicle.get_transform()
+        ego_fwd = ego_tf.get_forward_vector()
+        
+        try:
+            stop_signs = list(self.world.get_actors().filter("traffic.stop"))
+            traffic_lights = list(self.world.get_actors().filter("traffic.traffic_light"))
+        except:
+            stop_signs = []
+            traffic_lights = []
+        
+        # Check if ego has a stop sign ahead
+        for sign in stop_signs:
+            sign_loc = sign.get_location()
+            rel_to_sign = sign_loc - ego_loc
+            fwd_to_sign = rel_to_sign.x * ego_fwd.x + rel_to_sign.y * ego_fwd.y
+            
+            if 0 < fwd_to_sign < 30.0:
+                return False
+        
+        # Check if ego has a red traffic light ahead
+        for light in traffic_lights:
+            light_loc = light.get_location()
+            rel_to_light = light_loc - ego_loc
+            fwd_to_light = rel_to_light.x * ego_fwd.x + rel_to_light.y * ego_fwd.y
+            
+            if 0 < fwd_to_light < 30.0:
+                state = light.get_state()
+                if state == carla.TrafficLightState.Red:
+                    return False
+        
+        # Ego has right of way if no vehicles on the right
+        if not self.is_vehicle_on_right(narrow=False):
+            return True
+        
+        # Vehicles on the right: ego has right of way if they're constrained by stop signs/red lights
+        if self._right_vehicles_constrained():
+            return True
+        
+        # Vehicles on the right without constraints -> ego doesn't have right of way
+        return False
 
     def is_vehicle_on_right(self, narrow: bool = False) -> bool:
         """Returns True if a vehicle is ahead and to the right of the ego."""
@@ -276,6 +315,60 @@ class DataBinder:
                     right_dist = rel_vec.x * right_vec.x + rel_vec.y * right_vec.y
                     if 0 < right_dist < right_range:
                         return True
+            except:
+                continue
+        return False
+
+    def _right_vehicles_constrained(self) -> bool:
+        """Returns True if vehicles on the right have a stop sign or red traffic light ahead."""
+        ego_tf = self.ego_vehicle.get_transform()
+        ego_loc = ego_tf.location
+        ego_fwd = ego_tf.get_forward_vector()
+        right_vec = ego_tf.get_right_vector()
+
+        fwd_range = 30.0
+        right_range = 3.0
+
+        try:
+            current_vehicles = list(self.world.get_actors().filter("vehicle.*"))
+            stop_signs = list(self.world.get_actors().filter("traffic.stop"))
+            traffic_lights = list(self.world.get_actors().filter("traffic.traffic_light"))
+        except:
+            return False
+
+        for v in current_vehicles:
+            if v.id == self.ego_vehicle.id:
+                continue
+            try:
+                rel_vec  = v.get_transform().location - ego_loc
+                fwd_dist = rel_vec.x * ego_fwd.x + rel_vec.y * ego_fwd.y
+                if 0 < fwd_dist < fwd_range:
+                    right_dist = rel_vec.x * right_vec.x + rel_vec.y * right_vec.y
+                    if 0 < right_dist < right_range:
+                        # Found a vehicle on the right, check if it has stop/red light ahead
+                        v_tf = v.get_transform()
+                        v_fwd = v_tf.get_forward_vector()
+                        v_loc = v_tf.location
+
+                        # Check stop signs
+                        for sign in stop_signs:
+                            sign_loc = sign.get_location()
+                            rel_to_sign = sign_loc - v_loc
+                            fwd_to_sign = rel_to_sign.x * v_fwd.x + rel_to_sign.y * v_fwd.y
+                            
+                            if 0 < fwd_to_sign < 30.0:
+                                return True
+
+                        # Check traffic lights (red)
+                        for light in traffic_lights:
+                            light_loc = light.get_location()
+                            rel_to_light = light_loc - v_loc
+                            fwd_to_light = rel_to_light.x * v_fwd.x + rel_to_light.y * v_fwd.y
+                            
+                            if 0 < fwd_to_light < 30.0:
+                                state = light.get_state()
+                                if state == carla.TrafficLightState.Red:
+                                    return True
             except:
                 continue
         return False
