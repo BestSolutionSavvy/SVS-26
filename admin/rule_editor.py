@@ -1,6 +1,7 @@
 from nicegui import ui
 from pathlib import Path
 import re
+from typing import Optional
 
 from mermaid_to_yaml import mermaid_to_yaml_file
 from yaml_to_mermaid import yaml_to_mermaid
@@ -15,6 +16,7 @@ rules_drawer = None
 rules_list_container = None
 new_rule_dialog = None
 new_rule_name_input = None
+info_dialog = None
 current_rule_name = None
 current_rule_path = None
 
@@ -35,7 +37,13 @@ def close_rules_drawer():
         rules_drawer.hide()
 
 
-def set_current_rule(rule_name: str, file_path: Path) -> None:
+def open_info_dialog() -> None:
+    """Open the dialog showing available data fields"""
+    if info_dialog is not None:
+        info_dialog.open()
+
+
+def set_current_rule(rule_name: Optional[str], file_path: Optional[Path]) -> None:
     """Set the currently active rule"""
     global current_rule_name, current_rule_path
     current_rule_name = rule_name
@@ -79,8 +87,26 @@ def render_rules_list() -> None:
             return
 
         for rule_name in rules_list:
-            ui.button(rule_name).on_click(lambda r=rule_name: handle_rule_click(
-                r)).classes('w-full justify-start mb-2')
+            with ui.row().classes('w-full justify-between items-center mb-2 gap-2'):
+                ui.button(rule_name).on_click(lambda r=rule_name: handle_rule_click(
+                    r)).classes('flex-1 justify-start truncate')
+                ui.button(icon='delete', color='negative', on_click=lambda r=rule_name: delete_rule(
+                    r)).props('flat round dense')
+
+
+def delete_rule(rule_name: str) -> None:
+    """Delete a rule file"""
+    file_path = rules_dir / f'{rule_name}.yaml'
+    try:
+        file_path.unlink()
+        ui.notify(f'Deleted {rule_name}')
+        if current_rule_name == rule_name:
+            set_current_rule(None, None)
+            content['code'] = ''
+            editor.set_value('')
+        render_rules_list()
+    except Exception as e:
+        ui.notify(f'Error deleting rule: {e}')
 
 
 # ============================================================================
@@ -194,14 +220,31 @@ with new_rule_dialog:
             ui.button('Cancel', on_click=new_rule_dialog.close).props('flat')
             ui.button('Create', color='primary', on_click=create_new_rule)
 
+# Dialog for displaying available data fields
+info_dialog = ui.dialog()
+with info_dialog:
+    with ui.card().classes('w-full max-w-2xl'):
+        with ui.column().classes('w-full gap-4'):
+            ui.label('Available Data Fields').classes('text-h6 font-bold')
+            try:
+                data_content = (Path(__file__).parent / 'data.md').read_text()
+                escaped_content = data_content.replace('_', '\\_')
+                ui.markdown(escaped_content).classes('overflow-auto max-h-96')
+            except:
+                ui.label('Error loading data fields')
+            ui.button('Close', on_click=info_dialog.close).props('flat').classes('self-end')
+
 # Main layout: Editor on left, Preview on right
 with ui.row().classes('w-full no-wrap h-screen overflow-hidden'):
     # Editor panel
     with ui.column().classes('w-1/2 pt-10 h-full flex flex-col overflow-hidden'):
         with ui.row().classes('w-full items-center justify-between mb-2'):
             ui.label('Editor Mermaid').classes('text-h6')
-            ui.button(icon='save', color='secondary',
-                      on_click=save_current_rule).props('unelevated')
+            with ui.row().classes('gap-2'):
+                ui.button(icon='info', color='primary',
+                          on_click=open_info_dialog).props('unelevated')
+                ui.button(icon='save', color='secondary',
+                          on_click=save_current_rule).props('unelevated')
 
         editor = ui.codemirror(
             value=content['code'],
