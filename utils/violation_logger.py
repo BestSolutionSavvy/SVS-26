@@ -58,6 +58,6 @@ class ViolationLogger:
         
         with open(self.log_file, 'a') as f:
             for entry in self.buffer:
-                f.write(json.dumps(entry) + '\n')
+                f.write(json.dumps(entry) + ',\n')
         
         self.buffer.clear()
