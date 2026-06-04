@@ -33,12 +33,13 @@ def test_state_machine_transition_back_on_false_condition(dummy_rule, idle_state
 
 
 def test_state_machine_stays_in_state_on_no_match(dummy_rule, idle_state):
-    """StateMachine stays in current state if no transition matches."""
+    """StateMachine returns None when no transition matches."""
     sm = StateMachine(dummy_rule)
-    # idle -> warning requires value > 10, but we stay at idle boundary
+    # idle -> warning requires value > 10, but we have value = 10 so no match
     new_state, transition = sm.evaluate(LazyDict({"value": 10}))
-    assert new_state == idle_state, "Should stay in idle when condition is not met"
+    assert new_state is None, "Should return None when no transition matches"
     assert transition is None, "No transition should have been executed"
+    assert sm.current_state == idle_state, "Internal state should remain in idle"
 
 
 def test_state_machine_repr(dummy_rule):

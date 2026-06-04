@@ -42,7 +42,7 @@ def test_violation_logger_autoflush_on_buffer_full(tmp_path, dummy_rule):
     # Verify file contents
     lines = Path(vl.log_file).read_text().splitlines()
     assert len(lines) == 2, "Should have 2 entries in file"
-    entry = json.loads(lines[0])
+    entry = json.loads(lines[0].rstrip(','))  # Strip trailing comma from JSON
     assert "Test Rule" in entry["rule"]
 
 
@@ -106,5 +106,5 @@ def test_violation_logger_appends_to_existing_file(tmp_path, dummy_rule):
 
     lines = Path(vl.log_file).read_text().splitlines()
     assert len(lines) == 2, "Should have 2 entries total"
-    assert "Test Rule" in json.loads(lines[0])["rule"]
-    assert "Test Rule" in json.loads(lines[1])["rule"]
+    assert "Test Rule" in json.loads(lines[0].rstrip(','))["rule"]  # Strip trailing comma
+    assert "Test Rule" in json.loads(lines[1].rstrip(','))["rule"]  # Strip trailing comma
