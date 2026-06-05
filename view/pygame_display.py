@@ -45,6 +45,11 @@ class PygameDisplay:
         self._surface = None
         self._surface_lock = threading.Lock()
         self._camera = None
+        self._camera_views = [
+            carla.Transform(carla.Location(x=-5.5, z=2.5), carla.Rotation(pitch=-10)),
+            carla.Transform(carla.Location(x=-1.8, z=5), carla.Rotation(pitch=-30)),
+        ]
+        self._camera_view_idx = 0
 
         self._control = carla.VehicleControl()
         self.reverse = False
@@ -77,7 +82,7 @@ class PygameDisplay:
         bp.set_attribute("image_size_y", str(self._render_height))
         bp.set_attribute("fov", "90")
 
-        cam_transform = carla.Transform(carla.Location(x=-5.5, z=2.5), carla.Rotation(pitch=-10))
+        cam_transform = self._camera_views[self._camera_view_idx]
         self._camera = self.world.spawn_actor(bp, cam_transform, attach_to=self.ego_vehicle)
         
         weak_self = weakref.ref(self)
@@ -105,6 +110,13 @@ class PygameDisplay:
             self.current_lights &= ~int(carla.VehicleLightState.Reverse)
         self.ego_vehicle.set_light_state(carla.VehicleLightState(self.current_lights))
 
+    def _toggle_camera_view(self):
+        """Switch between top and low camera viewpoints."""
+        if not self._camera:
+            return
+        self._camera_view_idx = (self._camera_view_idx + 1) % len(self._camera_views)
+        self._camera.set_transform(self._camera_views[self._camera_view_idx])
+
     def tick(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -117,6 +129,8 @@ class PygameDisplay:
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r:
                     self._handle_reverse()
+                elif event.key == pygame.K_c:
+                    self._toggle_camera_view()
                 elif event.key in (pygame.K_q, pygame.K_ESCAPE):
                     self.running = False
                 # Arrow keys → blinker control (keyboard-only; joystick uses paddles)
@@ -183,6 +197,8 @@ class PygameDisplay:
             self.current_lights ^= int(carla.VehicleLightState.LeftBlinker)
             self.current_lights ^= int(carla.VehicleLightState.RightBlinker)
             self.ego_vehicle.set_light_state(carla.VehicleLightState(self.current_lights))
+        elif button == 3:   # Y → toggle camera view
+            self._toggle_camera_view()
         elif button == 4:   # paddle sx → left blinker
             self._toggle_blinker(left=True)
         elif button == 5:   # paddle dx → right blinker

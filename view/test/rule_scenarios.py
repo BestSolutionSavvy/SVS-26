@@ -8,7 +8,7 @@ from typing import Any, Dict, List
 
 import random
 import carla
-from utils.carla_utils import spawn_vehicle_ahead
+from utils.carla_utils import spawn_vehicle_ahead, spawn_random_vehicle_no_bike_at
 
 
 def lane_keeping_scenario(ego_vehicle: carla.Actor) -> Dict[str, Any]:
@@ -78,63 +78,52 @@ def stop_scenario(ego_vehicle: carla.Actor) -> Dict[str, Any]:
 
 
 def right_of_way_scenario(ego_vehicle: carla.Actor) -> Dict[str, Any]:
-    """Place `ego_vehicle` before an intersection and (if possible) spawn
-    another vehicle crossing the intersection to simulate right-of-way.
+    """Place ego_vehicle and two other vehicles in fixed right-of-way positions
+    in an intersection.
 
-    The spawned vehicle (if any) will be set to autopilot.
+    Fixed positions:
+    
+    ego:   Location(x=-5.535913, y=119.039459, z=0.001677)
+    right: Location(x=-21.044353, y=138.250305, z=0.001681)
+    front: Location(x=2.210113, y=147.035950, z=0.001720)
 
-    Returns:
-    - Dict[str, Any]: dict with keys `ego`, `transform`, `others`.
-    """
+        All spawned vehicles have autopilot disabled.
+
+        Returns:
+        
+    Dict[str, Any]: dict with keys ego, transform, others."""
     world = ego_vehicle.get_world()
-    ego_tf = ego_vehicle.get_transform()
-    road_map = world.get_map()
-    cur_wp = road_map.get_waypoint(
-        ego_tf.location, project_to_road=True, lane_type=carla.LaneType.Driving)
 
-    junction_wp = None
-    for d in range(5, 200, 5):
-        try:
-            cands = cur_wp.next(float(d))
-        except Exception:
-            cands = []
-        for c in cands:
-            if c.is_junction:
-                junction_wp = c
-                break
-        if junction_wp:
-            break
-
-    if junction_wp is None:
-        junction_wp = cur_wp
-
-    before_loc = junction_wp.transform.location - \
-        junction_wp.transform.get_forward_vector() * 6.0
-    ego_tf_new = carla.Transform(carla.Location(
-        before_loc.x, before_loc.y, before_loc.z + 0.3), junction_wp.transform.rotation)
+    ego_tf_new = carla.Transform(
+        carla.Location(x=-5.535913, y=119.039459, z=0.001677),
+        ego_vehicle.get_transform().rotation,
+    )
     ego_vehicle.set_transform(ego_tf_new)
     try:
         ego_vehicle.set_autopilot(False)
     except Exception:
         pass
 
+    spawn_points = [
+        carla.Transform(
+            carla.Location(x=-21.044353, y=138.250305, z=0.001681),
+            ego_tf_new.rotation,
+        ),
+        carla.Transform(
+            carla.Location(x=2.210113, y=147.035950, z=0.001720),
+            ego_tf_new.rotation,
+        ),
+    ]
+
     others: List[carla.Actor] = []
     try:
-        bps = world.get_blueprint_library().filter("vehicle.*")
-        if bps:
-            bp = random.choice(bps)
-            other = world.try_spawn_actor(bp, junction_wp.transform)
-            if other is not None:
-                try:
-                    other.set_autopilot(True)
-                except Exception:
-                    pass
-                others.append(other)
+        for tf in spawn_points:
+            other = spawn_random_vehicle_no_bike_at(world, tf, autopilot=False)
+            others.append(other)
     except Exception:
         pass
 
     return {"ego": ego_vehicle, "transform": ego_tf_new, "others": others}
-
 
 def safe_distance_scenario(ego_vehicle: carla.Actor) -> Dict[str, Any]:
     """Align `ego_vehicle` to the lane and spawn a vehicle shortly ahead.

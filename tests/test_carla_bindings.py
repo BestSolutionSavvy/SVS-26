@@ -1,5 +1,99 @@
 """Test cases for CARLA bindings."""
-from carla_bindings import LazyDict
+from carla_bindings import DataBinder, LazyDict
+
+
+class DummyVector:
+    def __init__(self, x=0.0, y=0.0, z=0.0):
+        self.x = x
+        self.y = y
+        self.z = z
+
+
+class DummyLocation(DummyVector):
+    def __add__(self, other):
+        return DummyLocation(self.x + other.x, self.y + other.y, self.z + other.z)
+
+    def __sub__(self, other):
+        return DummyLocation(self.x - other.x, self.y - other.y, self.z - other.z)
+
+    def distance(self, other):
+        dx = self.x - other.x
+        dy = self.y - other.y
+        dz = self.z - other.z
+        return (dx * dx + dy * dy + dz * dz) ** 0.5
+
+
+class DummyExtent:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+
+class DummyBoundingBox:
+    def __init__(self, extent_x, extent_y):
+        self.extent = DummyExtent(extent_x, extent_y)
+
+
+class DummyTransform:
+    def __init__(self, location, forward, right):
+        self.location = location
+        self._forward = forward
+        self._right = right
+
+    def get_forward_vector(self):
+        return self._forward
+
+    def get_right_vector(self):
+        return self._right
+
+
+class DummyActor:
+    def __init__(self, actor_id, location, forward, right, extent_x=2.0, extent_y=1.0):
+        self.id = actor_id
+        self.bounding_box = DummyBoundingBox(extent_x, extent_y)
+        self._transform = DummyTransform(location, forward, right)
+
+    def get_transform(self):
+        return self._transform
+
+
+class DummyActorList:
+    def __init__(self, vehicles):
+        self._vehicles = vehicles
+
+    def filter(self, pattern):
+        if pattern == "vehicle.*":
+            return list(self._vehicles)
+        return []
+
+
+class DummyMap:
+    def get_waypoint(self, location, project_to_road=True):
+        return None
+
+
+class DummyWorld:
+    def __init__(self, vehicles):
+        self._actors = DummyActorList(vehicles)
+
+    def get_map(self):
+        return DummyMap()
+
+    def get_actors(self):
+        return self._actors
+
+
+def build_binder(vehicles):
+    ego = DummyActor(
+        actor_id=1,
+        location=DummyLocation(0.0, 0.0, 0.0),
+        forward=DummyVector(1.0, 0.0, 0.0),
+        right=DummyVector(0.0, 1.0, 0.0),
+        extent_x=2.0,
+        extent_y=1.0,
+    )
+    world = DummyWorld([ego, *vehicles])
+    return DataBinder(world, ego)
 
 
 def test_get_cached_dict_returns_normal_dict():
@@ -75,4 +169,34 @@ def test_get_cached_dict_with_no_accessed_values():
     # Should be an empty dict
     assert cached == {}
     assert isinstance(cached, dict)
+
+
+def test_is_vehicle_on_right_detects_vehicle_inside_right_rectangle():
+    """A vehicle whose body overlaps the right-front rectangle should count."""
+    vehicle = DummyActor(
+        actor_id=2,
+        location=DummyLocation(12.0, 3.4, 0.0),
+        forward=DummyVector(1.0, 0.0, 0.0),
+        right=DummyVector(0.0, 1.0, 0.0),
+        extent_x=2.0,
+        extent_y=0.5,
+    )
+    binder = build_binder([vehicle])
+
+    assert binder.is_vehicle_on_right(narrow=False) is True
+
+
+def test_is_vehicle_on_right_ignores_vehicle_outside_right_rectangle():
+    """Vehicles entirely outside the rectangle should not be detected."""
+    vehicle = DummyActor(
+        actor_id=2,
+        location=DummyLocation(12.0, 4.5, 0.0),
+        forward=DummyVector(1.0, 0.0, 0.0),
+        right=DummyVector(0.0, 1.0, 0.0),
+        extent_x=2.0,
+        extent_y=0.5,
+    )
+    binder = build_binder([vehicle])
+
+    assert binder.is_vehicle_on_right(narrow=False) is False
 

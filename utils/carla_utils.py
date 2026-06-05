@@ -208,3 +208,18 @@ def write_log(filename, frame_count, timestamp, control, scene_data, reverse):
     
     with open(filename, 'a') as f:
         f.write(json.dumps(log_entry) + '\n')
+        
+def spawn_random_vehicle_no_bike_at(world, transform, vehicle_filter="vehicle.tesla.model3", autopilot=False):
+    """Spawn a random non-bicycle vehicle at a fixed transform."""
+    bps = world.get_blueprint_library().filter(vehicle_filter)
+    all_vehicles = bps.filter("vehicle.*")
+    vehicles = [bp for bp in all_vehicles if "bicycle" not in bp.id]
+    if not vehicles:
+        vehicles = all_vehicles
+
+    actor = world.try_spawn_actor(random.choice(vehicles), transform)
+    if actor is None:
+        raise RuntimeError("Could not spawn vehicle at the requested transform")
+
+    actor.set_autopilot(autopilot)
+    return actor

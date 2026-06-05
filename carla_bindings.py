@@ -1,5 +1,6 @@
 import carla
 from typing import Dict, Any, Optional
+from utils.right_of_way_utils import ZoneConfig, check_right_forward_zones, ProximityStatus
 
 
 class LazyDict(dict):
@@ -165,14 +166,14 @@ class DataBinder:
         """Minimum lateral distance from the ego bounding box edge to the nearest lane line.
 
         Returns -1.0 if an edge has crossed a line (violation sentinel).
-        Returns  0.0 inside junctions or on API failure.
+        Returns  inf inside junctions or on API failure.
         """
         ego_loc = self.get_ego_location()
         try:
             waypoint = self.map_obj.get_waypoint(ego_loc, project_to_road=True)
 
             if waypoint.is_junction:
-                return 0.0
+                return float('inf')
 
             rel_vec   = ego_loc - waypoint.transform.location
             right_vec = waypoint.transform.get_right_vector()
@@ -187,7 +188,7 @@ class DataBinder:
 
             return -1.0 if min_dist < 0.0 else min_dist
         except:
-            return 0.0
+            return float('inf')
 
     def is_in_intersection(self) -> bool:
         ego_loc = self.get_ego_location()
@@ -198,31 +199,42 @@ class DataBinder:
             return False
 
     def get_lane_marking_type(self) -> str:
-        """Returns 'continuous', 'dashed', or 'unknown'."""
-        ego_loc = self.get_ego_location()
-        try:
-            waypoint = self.map_obj.get_waypoint(ego_loc, project_to_road=True)
-            marking_type = waypoint.right_lane_marking.type
+            """Returns 'continuous', 'dashed', or 'unknown' based on the closest lane marking."""
+            ego_loc = self.get_ego_location()
+            try:
+                waypoint = self.map_obj.get_waypoint(ego_loc, project_to_road=True)
 
-            if marking_type == carla.LaneMarkingType.Solid:
-                return 'continuous'
-            elif marking_type in (carla.LaneMarkingType.Broken,
-                                  carla.LaneMarkingType.BrokenSolid,
-                                  carla.LaneMarkingType.SolidBroken,
-                                  carla.LaneMarkingType.BrokenBroken):
-                return 'dashed'
-            elif marking_type == carla.LaneMarkingType.NONE:
-                left_marking = waypoint.left_lane_marking.type
-                if left_marking == carla.LaneMarkingType.Solid:
+                if waypoint.is_junction:
+                    return 'unknown'
+
+                rel_vec   = ego_loc - waypoint.transform.location
+                right_vec = waypoint.transform.get_right_vector()
+
+                signed_offset = rel_vec.x * right_vec.x + rel_vec.y * right_vec.y
+                half_lane = waypoint.lane_width / 2.0
+                half_car  = self.ego_vehicle.bounding_box.extent.y
+
+                right_edge_dist = half_lane - (signed_offset + half_car)
+                left_edge_dist  = half_lane - (-signed_offset + half_car)
+
+                # Determine which marking is closer
+                if abs(right_edge_dist) <= abs(left_edge_dist):
+                    marking_type = waypoint.right_lane_marking.type
+                else:
+                    marking_type = waypoint.left_lane_marking.type
+
+                if marking_type == carla.LaneMarkingType.Solid:
                     return 'continuous'
-                elif left_marking in (carla.LaneMarkingType.Broken,
-                                      carla.LaneMarkingType.BrokenSolid,
-                                      carla.LaneMarkingType.SolidBroken,
-                                      carla.LaneMarkingType.BrokenBroken):
+                elif marking_type in (carla.LaneMarkingType.Broken,
+                                    carla.LaneMarkingType.BrokenSolid,
+                                    carla.LaneMarkingType.SolidBroken,
+                                    carla.LaneMarkingType.BrokenBroken):
                     return 'dashed'
-            return 'unknown'
-        except:
-            return 'unknown'
+                else:
+                    return 'unknown'
+            except:
+                return 'unknown'
+
 
     def get_indicator_state(self) -> Optional[str]:
         """Returns 'left', 'right', 'both', or None."""
@@ -291,33 +303,27 @@ class DataBinder:
         return False
 
     def is_vehicle_on_right(self, narrow: bool = False) -> bool:
-        """Returns True if a vehicle is ahead and to the right of the ego."""
-        ego_tf = self.ego_vehicle.get_transform()
-        ego_loc = ego_tf.location
-        ego_fwd = ego_tf.get_forward_vector()
-        right_vec = ego_tf.get_right_vector()
+        """Returns True if a vehicle is ahead and to the right of the ego.
 
-        fwd_range   = 15.0 if narrow else 30.0
-        right_range = 1.5  if narrow else 3.0
+        narrow=False → zona ampia (warning)
+        narrow=True  → zona stretta (violation)
+        """
+        config = ZoneConfig(
+            warn_forward_offset=0.0,
+            warn_lateral_offset=0.3,
+            warn_length=30.0,
+            warn_width=10,
+            viol_forward_offset=0.0,
+            viol_lateral_offset=0.3,
+            viol_length=15.0,
+            viol_width=5.0,
+        )
+        result = check_right_forward_zones(self.ego_vehicle, self.world, config)
 
-        try:
-            current_vehicles = list(self.world.get_actors().filter("vehicle.*"))
-        except:
-            return False
-
-        for v in current_vehicles:
-            if v.id == self.ego_vehicle.id:
-                continue
-            try:
-                rel_vec  = v.get_transform().location - ego_loc
-                fwd_dist = rel_vec.x * ego_fwd.x + rel_vec.y * ego_fwd.y
-                if 0 < fwd_dist < fwd_range:
-                    right_dist = rel_vec.x * right_vec.x + rel_vec.y * right_vec.y
-                    if 0 < right_dist < right_range:
-                        return True
-            except:
-                continue
-        return False
+        if narrow:
+            return len(result.violation_vehicles) > 0
+        else:
+            return result.status != ProximityStatus.CLEAR
 
     def _right_vehicles_constrained(self) -> bool:
         """Returns True if vehicles on the right have a stop sign or red traffic light ahead."""
