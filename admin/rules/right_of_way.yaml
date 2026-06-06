@@ -13,22 +13,22 @@ state_machine:
     to: idle
   - from: idle
     to: intersection
-    condition: in_intersection == True and precedence == True
+    condition: in_intersection == True and ego_has_stop_sign == False and ego_has_red_light == False
   - from: intersection
     to: warning
-    condition: broad_right_occupied == True
+    condition: right_wedge_far == True
   - from: warning
     to: intersection
-    condition: broad_right_occupied == False
-  - from: warning
-    to: idle
-    condition: in_intersection == False
+    condition: right_wedge_far == False
   - from: warning
     to: violation
-    condition: narrow_right_occupied == True
+    condition: right_wedge_near == True
   - from: violation
     to: idle
     condition: in_intersection == False
   - from: intersection
+    to: idle
+    condition: in_intersection == False
+  - from: warning
     to: idle
     condition: in_intersection == False
