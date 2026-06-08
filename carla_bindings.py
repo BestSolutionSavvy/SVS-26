@@ -30,7 +30,9 @@ class DataBinder:
         self.map_obj = world.get_map()
 
         self._vehicle_ahead = None
+        self._wedge_vehicle = None
         self._sign_ahead = None
+        self._last_traffic_light = None
 
     # --- Dynamic variables ---
 
@@ -43,22 +45,25 @@ class DataBinder:
 
     def get_ego_forward_vector(self) -> carla.Vector3D:
         return self.ego_vehicle.get_transform().get_forward_vector()
+    
+    def get_ego_distance_to_sign(self, sign_type: str = "stop") -> float:
+        return self._get_distance_to_sign(self.ego_vehicle, sign_type=sign_type)
 
-    def get_distance_to_sign(self, sign_type: str = "stop") -> float:
+    def _get_distance_to_sign(self, vehicle: carla.Actor, sign_type: str = "stop") -> float:
         """Signed distance from the front bumper to the nearest same-lane sign.
 
         Returns positive if ahead, negative if already passed, inf if none found.
         Distance is the forward projection (not Euclidean) to handle signs
         placed laterally off the lane centre.
         """
-        ego_tf = self.ego_vehicle.get_transform()
-        ego_loc = ego_tf.location
-        ego_fwd = ego_tf.get_forward_vector()
+        tf = vehicle.get_transform()
+        loc = tf.location
+        fwd = tf.get_forward_vector()
 
-        ego_bbox  = self.ego_vehicle.bounding_box
-        ego_front = ego_loc + carla.Location(
-            x=ego_fwd.x * ego_bbox.extent.x,
-            y=ego_fwd.y * ego_bbox.extent.x,
+        bbox  = vehicle.bounding_box
+        front = loc + carla.Location(
+            x=fwd.x * bbox.extent.x,
+            y=fwd.y * bbox.extent.x,
             z=0,
         )
 
@@ -71,30 +76,30 @@ class DataBinder:
             return float('inf')
 
         try:
-            ego_waypoint = self.map_obj.get_waypoint(ego_loc, project_to_road=True)
-            ego_lane_id = ego_waypoint.lane_id
+            waypoint = self.map_obj.get_waypoint(loc, project_to_road=True)
+            lane_id = waypoint.lane_id
         except:
-            ego_lane_id = None
+            lane_id = None
 
         min_signed_dist = float('inf')
         best_sign = None
 
         for sign in signs:
             sign_loc = sign.get_location()
-            rel_vec  = sign_loc - ego_front
-            fwd_proj = rel_vec.x * ego_fwd.x + rel_vec.y * ego_fwd.y
+            rel_vec  = sign_loc - front
+            fwd_proj = rel_vec.x * fwd.x + rel_vec.y * fwd.y
 
             if fwd_proj < -5.0:
                 continue
 
             try:
                 sign_waypoint = self.map_obj.get_waypoint(sign_loc, project_to_road=True)
-                if ego_lane_id is not None and sign_waypoint.lane_id != ego_lane_id:
+                if lane_id is not None and sign_waypoint.lane_id != lane_id:
                     continue
             except:
                 pass
 
-            distance    = ego_front.distance(sign_loc)
+            distance    = front.distance(sign_loc)
             signed_dist = distance if fwd_proj >= 0 else -distance
 
             if abs(signed_dist) < abs(min_signed_dist):
@@ -190,10 +195,13 @@ class DataBinder:
         except:
             return float('inf')
 
-    def is_in_intersection(self) -> bool:
-        ego_loc = self.get_ego_location()
+    def ego_is_in_intersection(self) -> bool:
+        return self.is_in_intersection(self.ego_vehicle)
+    
+    def is_in_intersection(self, vehicle: carla.Actor) -> bool:
+        vehicle_loc = vehicle.get_transform().location
         try:
-            waypoint = self.map_obj.get_waypoint(ego_loc, project_to_road=True)
+            waypoint = self.map_obj.get_waypoint(vehicle_loc, project_to_road=True)
             return waypoint.is_intersection
         except:
             return False
@@ -252,27 +260,34 @@ class DataBinder:
         control = self.ego_vehicle.get_control()
         return 'left' if control.steer < 0 else 'right'
 
-    def ego_has_stop_sign(self) -> bool:
-        """True if there is a stop sign ahead on the ego's lane within 30 m."""
-        return 0 < self.get_distance_to_sign(sign_type="stop") < 30.0
+    def ego_can_enter_intersection(self) -> bool:
+        return self._vehicle_can_enter_intersection(self.ego_vehicle)
 
-    def ego_has_red_light(self) -> bool:
-        """True if there is a red traffic light ahead of the ego within 30 m."""
-        ego_tf  = self.ego_vehicle.get_transform()
-        ego_loc = ego_tf.location
-        ego_fwd = ego_tf.get_forward_vector()
+    def other_can_enter_intersection(self) -> bool:
+        """checks if the vehicle detected in the right wedge can enter the intersection"""
+        if self._wedge_vehicle is not None:
+            return (not self.vehicle_has_stop_sign(self._wedge_vehicle) and self._vehicle_can_enter_intersection(self._wedge_vehicle)) or self.is_in_intersection(self._wedge_vehicle)
+        return False
 
-        try:
-            traffic_lights = list(self.world.get_actors().filter("traffic.traffic_light"))
-        except:
-            return False
+    def _vehicle_can_enter_intersection(self, vehicle: carla.Actor) -> bool:
+        """checks if the given vehicle can enter the intersection: no stop sign or red light"""
+        return not self.vehicle_has_red_light(vehicle)
+        
 
-        for light in traffic_lights:
-            light_loc = light.get_location()
-            rel       = light_loc - ego_loc
-            fwd_proj  = rel.x * ego_fwd.x + rel.y * ego_fwd.y
-            if 0 < fwd_proj < 30.0 and light.get_state() == carla.TrafficLightState.Red:
-                return True
+    def vehicle_has_stop_sign(self, vehicle: carla.Actor) -> bool:
+        """True if there is a stop sign ahead on the vehicle's lane within 30 m."""
+        return 0 < self._get_distance_to_sign(vehicle, sign_type="stop") < 30.0
+
+    def vehicle_has_red_light(self, vehicle: carla.Actor) -> bool:
+        """True if there is a red traffic light ahead of the vehicle, strictly in the vehicle's lane."""
+        # Use built-in method: vehicle is at a traffic light if it's in its bounding box
+        if not vehicle.is_at_traffic_light():
+            return True 
+        
+        # Check if the traffic light affecting this vehicle is red
+        if vehicle.get_traffic_light_state() == carla.TrafficLightState.Red:
+            return True
+        
         return False
 
     def _get_right_zone_result(self):
@@ -327,11 +342,17 @@ class DataBinder:
         def right_zone():
             if not right_zone_cache:
                 right_zone_cache['v'] = self._get_right_zone_result()
+                if right_zone_cache['v'].status == ProximityStatus.VIOLATION:
+                    self._wedge_vehicle = right_zone_cache['v'].violation_vehicles[0]
+                elif right_zone_cache['v'].status == ProximityStatus.WARNING:
+                    self._wedge_vehicle = right_zone_cache['v'].warning_vehicles[0]
+                else:
+                    self._wedge_vehicle = None
             return right_zone_cache['v']
 
         resolvers = {
             # STOP
-            'distance_to_sign': self.get_distance_to_sign,
+            'distance_to_sign': self.get_ego_distance_to_sign,
             'ego_speed':        self.get_ego_speed,
 
             # SAFE_DISTANCE
@@ -341,9 +362,9 @@ class DataBinder:
 
             # RIGHT_OF_WAY
             'ego_location':      self.get_ego_location,
-            'in_intersection':   self.is_in_intersection,
-            'ego_has_stop_sign': self.ego_has_stop_sign,
-            'ego_has_red_light': self.ego_has_red_light,
+            'in_intersection':   self.ego_is_in_intersection,
+            'ego_can_enter_intersection' : self.ego_can_enter_intersection,
+            'other_can_enter_intersection' : self.other_can_enter_intersection,
             'right_wedge_far':   lambda: right_zone().status != ProximityStatus.CLEAR,
             'right_wedge_near':  lambda: len(right_zone().violation_vehicles) > 0,
 
