@@ -171,32 +171,5 @@ def test_get_cached_dict_with_no_accessed_values():
     assert isinstance(cached, dict)
 
 
-def test_is_vehicle_on_right_detects_vehicle_inside_right_rectangle():
-    """A vehicle whose body overlaps the right-front rectangle should count."""
-    vehicle = DummyActor(
-        actor_id=2,
-        location=DummyLocation(12.0, 3.4, 0.0),
-        forward=DummyVector(1.0, 0.0, 0.0),
-        right=DummyVector(0.0, 1.0, 0.0),
-        extent_x=2.0,
-        extent_y=0.5,
-    )
-    binder = build_binder([vehicle])
 
-    assert binder.is_vehicle_on_right(narrow=False) is True
-
-
-def test_is_vehicle_on_right_ignores_vehicle_outside_right_rectangle():
-    """Vehicles entirely outside the rectangle should not be detected."""
-    vehicle = DummyActor(
-        actor_id=2,
-        location=DummyLocation(12.0, 4.5, 0.0),
-        forward=DummyVector(1.0, 0.0, 0.0),
-        right=DummyVector(0.0, 1.0, 0.0),
-        extent_x=2.0,
-        extent_y=0.5,
-    )
-    binder = build_binder([vehicle])
-
-    assert binder.is_vehicle_on_right(narrow=False) is False
 

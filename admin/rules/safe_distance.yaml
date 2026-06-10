@@ -16,13 +16,13 @@ state_machine:
     to: idle
   - from: idle
     to: warning
-    condition: distance_to_lead < threshold_safe
+    condition: distance_to_lead < safe_distance
   - from: warning
     to: idle
-    condition: distance_to_lead >= threshold_safe
+    condition: distance_to_lead >= safe_distance
   - from: warning
     to: violation
-    condition: distance_to_lead < threshold_min
+    condition: distance_to_lead < min_distance
   - from: violation
     to: warning
-    condition: distance_to_lead >= threshold_min
+    condition: distance_to_lead >= min_distance

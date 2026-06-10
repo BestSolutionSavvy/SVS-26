@@ -1,4 +1,3 @@
-from typing import Dict, Any, Optional
 class LazyDict(dict):
     def __init__(self, resolvers: dict):
         dict.__init__(self)
@@ -26,5 +25,4 @@ class LazyDict(dict):
             return default
 
     def get_cached_dict(self) -> dict:
-        """Ritorna un dict normale con tutte le variabili già calcolate."""
         return dict(self)

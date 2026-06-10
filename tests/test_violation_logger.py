@@ -40,10 +40,10 @@ def test_violation_logger_autoflush_on_buffer_full(tmp_path, dummy_rule):
     assert Path(vl.log_file).exists(), "Log file should be created"
 
     # Verify file contents
-    lines = Path(vl.log_file).read_text().splitlines()
-    assert len(lines) == 2, "Should have 2 entries in file"
-    entry = json.loads(lines[0].rstrip(','))  # Strip trailing comma from JSON
-    assert "Test Rule" in entry["rule"]
+    with open(vl.log_file, 'r') as f:
+        entries = json.load(f)
+    assert len(entries) == 2, "Should have 2 entries in file"
+    assert "Test Rule" in entries[0]["rule"]
 
 
 def test_violation_logger_serializes_complex_objects(tmp_path, dummy_rule):
@@ -77,8 +77,9 @@ def test_violation_logger_manual_flush(tmp_path, dummy_rule):
     vl.flush()
     assert len(vl.buffer) == 0, "Buffer should be empty after flush"
     assert Path(vl.log_file).exists()
-    lines = Path(vl.log_file).read_text().splitlines()
-    assert len(lines) == 1
+    with open(vl.log_file, 'r') as f:
+        entries = json.load(f)
+    assert len(entries) == 1, "Should have 1 entry in file"
 
 
 def test_violation_logger_flush_noop_on_empty(tmp_path):
@@ -104,7 +105,8 @@ def test_violation_logger_appends_to_existing_file(tmp_path, dummy_rule):
     vl.log_violation(dummy_rule, t2, {"x": 2})
     vl.flush()
 
-    lines = Path(vl.log_file).read_text().splitlines()
-    assert len(lines) == 2, "Should have 2 entries total"
-    assert "Test Rule" in json.loads(lines[0].rstrip(','))["rule"]  # Strip trailing comma
-    assert "Test Rule" in json.loads(lines[1].rstrip(','))["rule"]  # Strip trailing comma
+    with open(vl.log_file, 'r') as f:
+        entries = json.load(f)
+    assert len(entries) == 2, "Should have 2 entries total"
+    assert "Test Rule" in entries[0]["rule"]
+    assert "Test Rule" in entries[1]["rule"]
