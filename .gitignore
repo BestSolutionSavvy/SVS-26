@@ -224,3 +224,5 @@ logs/
 
 # dummy package for testing
 carla.py
+
+.DS_Store
