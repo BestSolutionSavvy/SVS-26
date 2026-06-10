@@ -7,12 +7,14 @@ import yaml
 def state_machine_to_mermaid(sm, metadata=None):
     """Convert state_machine YAML structure to Mermaid stateDiagram-v2 format
     
-    Args:
-        sm: Dictionary containing state_machine configuration
-        metadata: Optional dictionary containing title, severity, fine
+    Parameters
+    -------
+    sm: Dictionary containing state_machine configuration
+    metadata: Optional dictionary containing title, severity, fine
         
-    Returns:
-        String containing Mermaid diagram code
+    Returns
+    -------
+    String containing Mermaid diagram code
     """
     if not sm:
         return ''
@@ -25,7 +27,6 @@ def state_machine_to_mermaid(sm, metadata=None):
     
     if metadata:
         lines.append('---')
-        # Dump metadata using YAML to preserve constants and quoting
         md_text = yaml.safe_dump(metadata, sort_keys=False, allow_unicode=True).strip()
         if md_text:
             lines.extend(md_text.splitlines())
@@ -44,7 +45,6 @@ def state_machine_to_mermaid(sm, metadata=None):
         if not from_state or not to_state:
             continue
         
-        # Skip [*] transitions (already handled above)
         if from_state == '[*]':
             continue
         
@@ -62,11 +62,17 @@ def state_machine_to_mermaid(sm, metadata=None):
 def load_yaml_rule(filepath):
     """Load a YAML rule file and parse it
     
-    Args:
-        filepath: Path to the YAML file
+    Parameters
+    -------
+    filepath: Path to the YAML file
         
-    Returns:
-        Tuple of (metadata, state_machine) or (None, None) if error
+    Returns
+    -------
+    Tuple of (metadata, state_machine) or (None, None) if error
+    
+    Raises
+    ------
+    ValueError if the file cannot be loaded or parsed
     """
     try:
         with open(filepath, 'r') as f:
@@ -84,11 +90,13 @@ def load_yaml_rule(filepath):
 def yaml_to_mermaid(filepath):
     """Load a YAML rule file and convert to Mermaid diagram code
     
-    Args:
-        filepath: Path to the YAML file
+    Parameters
+    -------
+    filepath: Path to the YAML file
         
-    Returns:
-        String containing Mermaid diagram code, or empty string if error
+    Returns
+    -------
+    String containing Mermaid diagram code, or empty string if error
     """
     try:
         metadata, state_machine = load_yaml_rule(filepath)

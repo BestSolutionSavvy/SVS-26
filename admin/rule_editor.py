@@ -8,7 +8,6 @@ from yaml_to_mermaid import yaml_to_mermaid
 
 ui.add_css('./style.css')
 
-# State variables
 content = {'code': ''}
 rules_dir = Path('rules')
 chart = None
@@ -20,10 +19,6 @@ info_dialog = None
 current_rule_name = None
 current_rule_path = None
 
-
-# ============================================================================
-# Drawer & UI Control Functions
-# ============================================================================
 
 def toggle_rules_drawer():
     """Toggle the rules drawer visibility"""
@@ -44,14 +39,24 @@ def open_info_dialog() -> None:
 
 
 def set_current_rule(rule_name: Optional[str], file_path: Optional[Path]) -> None:
-    """Set the currently active rule"""
+    """Set the currently active rule
+    
+    Parameters
+    -------
+    rule_name: name of the current rule (without extension)
+    file_path: path to the rule file
+    """
     global current_rule_name, current_rule_path
     current_rule_name = rule_name
     current_rule_path = file_path
 
 
 def new_rule_template(rule_name: str) -> str:
-    """Generate a YAML template for a new rule with Mermaid state diagram"""
+    """Generate a YAML template for a new rule with Mermaid state diagram
+    Parameters
+    -------
+    rule_name: name of the new rule (without extension)
+    """
     return f"""---
 title: {rule_name}
 severity: 4
@@ -61,11 +66,6 @@ stateDiagram-v2
 	direction TB
 	[*] --> idle
 """
-
-
-# ============================================================================
-# Rules List & Rendering Functions
-# ============================================================================
 
 def get_rules_list():
     """Get list of all .yaml files in rules directory"""
@@ -95,7 +95,12 @@ def render_rules_list() -> None:
 
 
 def delete_rule(rule_name: str) -> None:
-    """Delete a rule file"""
+    """Delete a rule file
+    
+    Parameters
+    -------
+    rule_name: name of the rule to delete (without extension)
+    """
     file_path = rules_dir / f'{rule_name}.yaml'
     try:
         file_path.unlink()
@@ -107,11 +112,6 @@ def delete_rule(rule_name: str) -> None:
         render_rules_list()
     except Exception as e:
         ui.notify(f'Error deleting rule: {e}')
-
-
-# ============================================================================
-# New Rule Creation Functions
-# ============================================================================
 
 def open_new_rule_dialog() -> None:
     """Open the dialog for creating a new rule"""
@@ -142,11 +142,6 @@ def create_new_rule() -> None:
     if new_rule_dialog is not None:
         new_rule_dialog.close()
 
-
-# ============================================================================
-# Rule Loading & Saving Functions
-# ============================================================================
-
 def save_current_rule() -> None:
     """Save the current rule to a YAML file"""
     if current_rule_path is None:
@@ -161,7 +156,13 @@ def save_current_rule() -> None:
 
 
 def load_rule(filename):
-    """Load a YAML rule file and update the editor with Mermaid code"""
+    """Load a YAML rule file and update the editor with Mermaid code
+    
+    Parameters
+    -------
+    filename: name of the rule file to load
+    
+    """
     filepath = rules_dir / filename
     try:
         mermaid_code = yaml_to_mermaid(filepath)
@@ -174,7 +175,13 @@ def load_rule(filename):
 
 
 def handle_rule_click(rule_name):
-    """Handle rule selection from the drawer"""
+    """Handle rule selection from the drawer
+    
+    Parameters
+    -------
+    rule_name: name of the rule clicked
+    
+    """
     load_rule(f'{rule_name}.yaml')
     close_rules_drawer()
 
@@ -186,17 +193,10 @@ def update_chart():
         chart.content = content['code']
 
 
-
-# ============================================================================
-# UI Layout & Components
-# ============================================================================
-
-# Menu button to toggle rules drawer
 ui.button(icon='menu', color='primary', on_click=toggle_rules_drawer)\
     .props('unelevated')\
     .classes('fixed top-2 left-2 z-50')
 
-# Left drawer with rules list
 with ui.left_drawer(value=True).props('overlay bordered').classes('w-64 p-4 bg-slate-100') as rules_drawer:
     with ui.column().classes('w-full overflow-auto'):
         with ui.row().classes('w-full items-center justify-between mb-2'):
@@ -210,7 +210,6 @@ with ui.left_drawer(value=True).props('overlay bordered').classes('w-64 p-4 bg-s
         rules_list_container = ui.column().classes('w-full')
         render_rules_list()
 
-# Dialog for creating new rules
 new_rule_dialog = ui.dialog()
 with new_rule_dialog:
     with ui.card().classes('w-96'):
@@ -220,7 +219,6 @@ with new_rule_dialog:
             ui.button('Cancel', on_click=new_rule_dialog.close).props('flat')
             ui.button('Create', color='primary', on_click=create_new_rule)
 
-# Dialog for displaying available data fields
 info_dialog = ui.dialog()
 with info_dialog:
     with ui.card().classes('w-full max-w-2xl'):
@@ -234,9 +232,8 @@ with info_dialog:
                 ui.label('Error loading data fields')
             ui.button('Close', on_click=info_dialog.close).props('flat').classes('self-end')
 
-# Main layout: Editor on left, Preview on right
+
 with ui.row().classes('w-full no-wrap h-screen overflow-hidden'):
-    # Editor panel
     with ui.column().classes('w-1/2 pt-10 h-full flex flex-col overflow-hidden'):
         with ui.row().classes('w-full items-center justify-between mb-2'):
             ui.label('Editor Mermaid').classes('text-h6')
@@ -255,7 +252,6 @@ with ui.row().classes('w-full no-wrap h-screen overflow-hidden'):
 
         editor.bind_value(content, 'code')
 
-    # Preview panel
     with ui.column().classes('w-1/2 h-full flex items-center justify-center overflow-hidden border-l border-gray-300'):
         with ui.column().classes('w-full h-full flex items-center justify-center overflow-hidden'):
             ui.label('Preview').classes('text-h6')
@@ -265,6 +261,5 @@ with ui.row().classes('w-full no-wrap h-screen overflow-hidden'):
 
         editor.on_value_change(lambda _: update_chart())
 
-# Start the app
 ui.run(native=True, title='Admin Rule Editor',
        window_size=(1200, 700), favicon='favicon.ico')
