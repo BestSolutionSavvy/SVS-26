@@ -9,15 +9,20 @@ from models.transition import Transition
 
 
 class ViolationLogger:
-    """Handles logging of rule violations to a JSON file with buffering."""
+    """
+    Handles logging of rule violations to a JSON file with buffering.
+    """
 
     def __init__(self, log_dir: str = "logs", buffer_size: int = 10):
         """
         Initialize the violation logger.
-        
-        Args:
-            log_dir: Directory to store logs (default "logs")
-            buffer_size: Flush to disk after this many violations (default 10)
+
+        Parameters
+        ----------
+        log_dir : str, optional
+            Directory to store logs. Defaults to "logs".
+        buffer_size : int, optional
+            Flush to disk after this many violations. Defaults to 10.
         """
         Path(log_dir).mkdir(exist_ok=True)
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -27,12 +32,16 @@ class ViolationLogger:
 
     def log_violation(self, rule: Rule, transition: Optional[Transition], scene_data: dict) -> None:
         """
-        Log a rule violation (buffered).
-        
-        Args:
-            rule: The Rule that was violated
-            transition: The Transition that represents the violation
-            scene_data: A dictionary of relevant scene data at the time of violation
+        Log a rule violation using an internal buffer.
+
+        Parameters
+        ----------
+        rule : Rule
+            The Rule that was violated.
+        transition : Transition, optional
+            The Transition that represents the violation.
+        scene_data : dict
+            A dictionary of relevant scene data at the time of violation.
         """
         scene_data_serializable = {
             k: str(v) if hasattr(v, '__dict__') else v
@@ -52,12 +61,23 @@ class ViolationLogger:
             self.flush()
 
     def flush(self) -> None:
-        """Write buffered violations to disk."""
+        """
+        Write buffered violations to disk.
+        """
         if not self.buffer:
             return
-        
-        with open(self.log_file, 'a') as f:
-            for entry in self.buffer:
-                f.write(json.dumps(entry) + ',\n')
-        
+
+        existing = []
+        if os.path.exists(self.log_file):
+            with open(self.log_file, 'r') as f:
+                try:
+                    existing = json.load(f)
+                except (json.JSONDecodeError, ValueError):
+                    existing = []
+
+        existing.extend(self.buffer)
+
+        with open(self.log_file, 'w') as f:
+            json.dump(existing, f, indent=4)
+
         self.buffer.clear()

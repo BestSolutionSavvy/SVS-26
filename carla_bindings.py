@@ -1,25 +1,7 @@
 import carla
 from typing import Dict, Any, Optional
+from utils.lazy_dict import LazyDict
 from utils.right_of_way_utils import ZoneConfig, check_right_forward_zones, ProximityStatus
-
-
-class LazyDict(dict):
-    def __init__(self, resolvers: dict):
-        super().__init__()
-        self._resolvers = resolvers
-
-    def __missing__(self, key):
-        if key not in self._resolvers:
-            raise KeyError(key)
-        resolver = self._resolvers[key]
-        value = resolver() if callable(resolver) else resolver
-        self[key] = value
-        return value
-
-    def get_cached_dict(self) -> dict:
-        """Ritorna un dict normale con tutte le variabili già calcolate."""
-        return dict(self)
-
 
 class DataBinder:
     """Binds guard variables to CARLA world queries."""
