@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>RCA — Test Results</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600&display=swap');
+
+    :root {
+      --bg:        #0f1117;
+      --surface:   #181c27;
+      --border:    #252b3b;
+      --pass:      #22c55e;
+      --pass-dim:  #14532d;
+      --fail:      #ef4444;
+      --fail-dim:  #7f1d1d;
+      --accent:    #6366f1;
+      --text:      #e2e8f0;
+      --muted:     #64748b;
+      --mono:      'IBM Plex Mono', monospace;
+      --sans:      'IBM Plex Sans', sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 48px 40px;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    /* ── Header ── */
+    header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 24px;
+      margin-bottom: 36px;
+    }
+
+    .eyebrow {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .meta {
+      font-size: 12px;
+      color: var(--muted);
+      font-family: var(--mono);
+    }
+
+    /* ── Summary bar ── */
+    .summary {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 20px 24px;
+      margin-bottom: 36px;
+    }
+
+    .summary-stat {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .summary-stat .number {
+      font-family: var(--mono);
+      font-size: 28px;
+      font-weight: 600;
+      line-height: 1;
+    }
+
+    .summary-stat .label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+
+    .number.pass { color: var(--pass); }
+    .number.fail { color: var(--fail); }
+    .number.total { color: var(--text); }
+
+    .divider {
+      width: 1px;
+      height: 40px;
+      background: var(--border);
+    }
+
+    .progress-bar {
+      flex: 1;
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--pass);
+      border-radius: 3px;
+      width: 100%;
+    }
+
+    /* ── Section heading ── */
+    .section-label {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* ── Test file group ── */
+    .file-group {
+      margin-bottom: 28px;
+    }
+
+    .file-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .file-name {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--accent);
+    }
+
+    .file-badge {
+      font-family: var(--mono);
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 3px;
+      background: var(--pass-dim);
+      color: var(--pass);
+    }
+
+    /* ── Test rows ── */
+    .test-table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .test-table tr {
+      border-bottom: 1px solid var(--border);
+    }
+
+    .test-table tr:last-child {
+      border-bottom: none;
+    }
+
+    .test-table td {
+      padding: 9px 14px;
+      vertical-align: middle;
+    }
+
+    .test-table tr:nth-child(even) {
+      background: #13161f;
+    }
+
+    .test-name {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--text);
+    }
+
+    .test-desc {
+      font-size: 12px;
+      color: var(--muted);
+      padding-left: 4px;
+    }
+
+    .status-dot {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      margin-right: 6px;
+      background: var(--pass);
+      flex-shrink: 0;
+    }
+
+    .status-dot.fail { background: var(--fail); }
+
+    .col-status { width: 80px; }
+    .col-duration { width: 70px; text-align: right; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+    .badge-pass {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--pass);
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="eyebrow">Rule-Consistency Auditor · Test Report</div>
+    <h1>Unit Test Results</h1>
+    <div class="meta">Generated 10 Jun 2026 · pytest 7.4.4 · Python 3.7.12 · 0.28 s</div>
+  </header>
+
+  <!-- Summary -->
+  <div class="summary">
+    <div class="summary-stat">
+      <span class="number total">27</span>
+      <span class="label">Total</span>
+    </div>
+    <div class="divider"></div>
+    <div class="summary-stat">
+      <span class="number pass">27</span>
+      <span class="label">Passed</span>
+    </div>
+    <div class="divider"></div>
+    <div class="summary-stat">
+      <span class="number fail">0</span>
+      <span class="label">Failed</span>
+    </div>
+    <div class="divider"></div>
+    <div class="progress-bar">
+      <div class="progress-fill"></div>
+    </div>
+  </div>
+
+  <!-- test_carla_bindings -->
+  <div class="file-group">
+    <div class="section-label">Test Suites</div>
+    <div class="file-header">
+      <span class="file-name">test_carla_bindings.py</span>
+      <span class="file-badge">9 / 9</span>
+    </div>
+    <table class="test-table">
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_get_cached_dict_returns_normal_dict</span><br><span class="test-desc">get_cached_dict returns a plain dict, not a LazyDict</span></td>
+        <td class="col-duration">0.00 s</td>
+      </tr>
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_get_cached_dict_contains_accessed_values</span><br><span class="test-desc">Only keys accessed before the call appear in the snapshot</span></td>
+        <td class="col-duration">0.00 s</td>
+      </tr>
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_get_cached_dict_with_all_values_accessed</span><br><span class="test-desc">Snapshot matches all resolved values when all keys accessed</span></td>
+        <td class="col-duration">0.00 s</td>
+      </tr>
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_get_cached_dict_with_no_accessed_values</span><br><span class="test-desc">Snapshot is empty when no keys have been accessed</span></td>
+        <td class="col-duration">0.00 s</td>
+      </tr>
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_right_wedge_vehicle_in_violation_zone</span><br><span class="test-desc">Vehicle inside viol zone sets both right_wedge_near and right_wedge_far</span></td>
+        <td class="col-duration">0.00 s</td>
+      </tr>
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_right_wedge_vehicle_in_warning_zone_only</span><br><span class="test-desc">Vehicle in warn zone only: right_wedge_far True, right_wedge_near False</span></td>
+        <td class="col-duration">0.00 s</td>
+      </tr>
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_right_wedge_vehicle_outside_both_zones</span><br><span class="test-desc">Vehicle outside both zones: both primitives False</span></td>
+        <td class="col-duration">0.00 s</td>
+      </tr>
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_right_wedge_vehicle_behind_ego</span><br><span class="test-desc">Vehicle behind ego (negative x): both primitives False</span></td>
+        <td class="col-duration">0.00 s</td>
+      </tr>
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_right_wedge_no_other_vehicles</span><br><span class="test-desc">No surrounding vehicles: both primitives False</span></td>
+        <td class="col-duration">0.00 s</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- test_parsing_utils -->
+  <div class="file-group">
+    <div class="file-header">
+      <span class="file-name">test_parsing_utils.py</span>
+      <span class="file-badge">8 / 8</span>
+    </div>
+    <table class="test-table">
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_parse_lane_keeping_rule_basic</span><br><span class="test-desc">Lane-keeping rule parses without error</span></td>
+        <td class="col-duration">0.00 s</td>
+      </tr>
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_parse_lane_keeping_rule_constants</span><br><span class="test-desc">Rule constants are loaded correctly from YAML</span></td>
+        <td class="col-duration">0.00 s</td>
+      </tr>
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_parse_lane_keeping_rule_transitions_count</span><br><span class="test-desc">Expected number of transitions are parsed</span></td>
+        <td class="col-duration">0.00 s</td>
+      </tr>
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_parse_lane_keeping_rule_transition_targets</span><br><span class="test-desc">Transition target states resolve correctly</span></td>
+        <td class="col-duration">0.00 s</td>
+      </tr>
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_parse_lane_keeping_rule_violation_condition</span><br><span class="test-desc">Violation transition carries correct guard expression</span></td>
+        <td class="col-duration">0.00 s</td>
+      </tr>
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_parse_nonexistent_file_returns_none</span><br><span class="test-desc">Parser returns None gracefully on missing file</span></td>
+        <td class="col-duration">0.00 s</td>
+      </tr>
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_parse_yaml_basic</span><br><span class="test-desc">Valid YAML parses into expected structure</span></td>
+        <td class="col-duration">0.00 s</td>
+      </tr>
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_parse_yaml_invalid_returns_empty</span><br><span class="test-desc">Malformed YAML returns empty result without raising</span></td>
+        <td class="col-duration">0.00 s</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- test_state_machine -->
+  <div class="file-group">
+    <div class="file-header">
+      <span class="file-name">test_state_machine.py</span>
+      <span class="file-badge">5 / 5</span>
+    </div>
+    <table class="test-table">
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_state_machine_initial_state</span><br><span class="test-desc">StateMachine initialises in the rule's declared initial state</span></td>
+        <td class="col-duration">0.00 s</td>
+      </tr>
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_state_machine_transition_on_true_condition</span><br><span class="test-desc">Guard evaluates to True → transition fires and state updates</span></td>
+        <td class="col-duration">0.00 s</td>
+      </tr>
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_state_machine_transition_back_on_false_condition</span><br><span class="test-desc">Guard reverts to False → machine returns to previous state</span></td>
+        <td class="col-duration">0.00 s</td>
+      </tr>
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_state_machine_stays_in_state_on_no_match</span><br><span class="test-desc">No matching transition → state unchanged, returns (None, None)</span></td>
+        <td class="col-duration">0.00 s</td>
+      </tr>
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_state_machine_repr</span><br><span class="test-desc">__repr__ includes rule name and current state</span></td>
+        <td class="col-duration">0.00 s</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- test_transition -->
+  <div class="file-group">
+    <div class="file-header">
+      <span class="file-name">test_transition.py</span>
+      <span class="file-badge">5 / 5</span>
+    </div>
+    <table class="test-table">
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_transition_verify_true</span><br><span class="test-desc">verify() returns True when condition is satisfied</span></td>
+        <td class="col-duration">0.00 s</td>
+      </tr>
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_transition_verify_false</span><br><span class="test-desc">verify() returns False when condition is not satisfied</span></td>
+        <td class="col-duration">0.00 s</td>
+      </tr>
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_transition_verify_complex_condition</span><br><span class="test-desc">Multi-variable guard expression evaluates correctly</span></td>
+        <td class="col-duration">0.00 s</td>
+      </tr>
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_transition_verify_missing_key_raises</span><br><span class="test-desc">KeyError raised when guard references undefined variable</span></td>
+        <td class="col-duration">0.00 s</td>
+      </tr>
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_transition_repr</span><br><span class="test-desc">__repr__ renders source, condition, and target correctly</span></td>
+        <td class="col-duration">0.00 s</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- test_violation_logger -->
+  <div class="file-group">
+    <div class="file-header">
+      <span class="file-name">test_violation_logger.py</span>
+      <span class="file-badge">5 / 5</span>
+    </div>
+    <table class="test-table">
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_violation_logger_autoflush_on_buffer_full</span><br><span class="test-desc">Logger flushes automatically when buffer_size is reached</span></td>
+        <td class="col-duration">0.01 s</td>
+      </tr>
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_violation_logger_serializes_complex_objects</span><br><span class="test-desc">Non-serialisable objects are stringified in scene snapshot</span></td>
+        <td class="col-duration">0.00 s</td>
+      </tr>
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_violation_logger_manual_flush</span><br><span class="test-desc">Explicit flush() drains buffer and writes JSON file</span></td>
+        <td class="col-duration">0.00 s</td>
+      </tr>
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_violation_logger_flush_noop_on_empty</span><br><span class="test-desc">flush() on empty buffer creates no file and raises no error</span></td>
+        <td class="col-duration">0.00 s</td>
+      </tr>
+      <tr>
+        <td class="col-status"><span class="status-dot"></span><span class="badge-pass">PASS</span></td>
+        <td><span class="test-name">test_violation_logger_appends_to_existing_file</span><br><span class="test-desc">Multiple flushes accumulate entries in the same JSON file</span></td>
+        <td class="col-duration">0.00 s</td>
+      </tr>
+    </table>
+  </div>
+
+</body>
+</html>
