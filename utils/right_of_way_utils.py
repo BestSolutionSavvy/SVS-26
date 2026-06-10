@@ -14,24 +14,22 @@ class ProximityStatus(Enum):
 @dataclass
 class ZoneConfig:
     """
-    Parametri delle zone di rilevamento nel sistema di riferimento locale
-    del veicolo ego (forward = +X, right = +Y).
+    Configuration parameters for the proximity detection zones.
 
-    Le zone si estendono nella direzione right-forward (quadrante destra-avanti).
+    Defines rectangular areas in the ego vehicle's local frame 
+    (Forward = +X, Right = +Y).
     """
-    # Warning zone (rettangolo esterno, arancione)
-    warn_forward_offset: float = 0.0    # offset dal centro del veicolo in avanti [m]
-    warn_lateral_offset: float = 0.5    # offset laterale verso destra [m]
-    warn_length: float = 12.0           # estensione in avanti [m]
-    warn_width: float = 4.0             # estensione laterale [m]
+    warn_forward_offset: float = 0.0    
+    warn_lateral_offset: float = 0.5    
+    warn_length: float = 12.0          
+    warn_width: float = 4.0            
 
-    # Violation zone (rettangolo interno, rosso)
-    viol_forward_offset: float = 2.0    # offset in avanti [m]
-    viol_lateral_offset: float = 0.5    # offset laterale verso destra [m]
-    viol_length: float = 6.0            # estensione in avanti [m]
-    viol_width: float = 2.5             # estensione laterale [m]
+    viol_forward_offset: float = 2.0    
+    viol_lateral_offset: float = 0.5    
+    viol_length: float = 6.0            
+    viol_width: float = 2.5            
 
-    check_z_range: float = 2.0          # tolleranza verticale [m]
+    check_z_range: float = 2.0          
 
 
 @dataclass
@@ -46,8 +44,20 @@ def _world_to_local(
     actor_location: carla.Location
 ) -> Tuple[float, float, float]:
     """
-    Trasforma una posizione world-space nel sistema di riferimento locale
-    dell'ego (forward=+X, right=+Y, up=+Z).
+    Transform a world location into the local coordinate frame of the ego vehicle.
+
+    Parameters
+    ----------
+    ego_transform : carla.Transform
+        The current global transform of the ego vehicle.
+    actor_location : carla.Location
+        The global location of the target actor.
+
+    Returns
+    -------
+    Tuple[float, float, float]
+        A tuple containing (local_x, local_y, local_z), where +X is forward 
+        and +Y is right relative to the ego vehicle.
     """
     dx = actor_location.x - ego_transform.location.x
     dy = actor_location.y - ego_transform.location.y
@@ -57,9 +67,8 @@ def _world_to_local(
     cos_yaw = math.cos(yaw_rad)
     sin_yaw = math.sin(yaw_rad)
 
-    # Rotazione inversa: proietta il delta nel frame locale
-    local_x = cos_yaw * dx + sin_yaw * dy   # forward
-    local_y = -sin_yaw * dx + cos_yaw * dy  # right (left = negativo)
+    local_x = cos_yaw * dx + sin_yaw * dy   
+    local_y = -sin_yaw * dx + cos_yaw * dy  
 
     return local_x, local_y, dz
 
@@ -73,12 +82,27 @@ def _point_in_rect(
     width: float,
 ) -> bool:
     """
-    Controlla se un punto (local_x, local_y) è all'interno del rettangolo
-    definito nel sistema di riferimento locale.
+    Check if a 2D point lies within a specific rectangular zone in the local frame.
 
-    Il rettangolo occupa:
-        X in [forward_offset, forward_offset + length]
-        Y in [lateral_offset, lateral_offset + width]
+    Parameters
+    ----------
+    local_x : float
+        Target X coordinate (forward).
+    local_y : float
+        Target Y coordinate (right).
+    forward_offset : float
+        Start distance of the zone along the X axis.
+    lateral_offset : float
+        Start distance of the zone along the Y axis.
+    length : float
+        Total length of the zone along the X axis.
+    width : float
+        Total width of the zone along the Y axis.
+
+    Returns
+    -------
+    bool
+        True if the point is inside the rectangle boundaries, False otherwise.
     """
     in_x = forward_offset <= local_x <= forward_offset + length
     in_y = lateral_offset <= local_y <= lateral_offset + width
@@ -91,22 +115,27 @@ def check_right_forward_zones(
     config: ZoneConfig = None,
 ) -> ZoneCheckResult:
     """
-    Controlla la presenza di veicoli nelle zone destra-frontale dell'ego.
+    Evaluate surrounding vehicles to detect proximity threats in designated zones.
 
-    Parametri
-    ---------
+    Scans all active vehicles in the CARLA world, filters out the ego vehicle and 
+    objects outside the vertical range, and maps them to either the warning or 
+    violation zone based on their relative coordinates.
+
+    Parameters
+    ----------
     ego_vehicle : carla.Actor
-        Il veicolo ego di riferimento.
+        The reference vehicle executing the checks.
     world : carla.World
-        Il mondo CARLA corrente.
+        The current CARLA world instance.
     config : ZoneConfig, optional
-        Configurazione delle dimensioni delle zone. Usa i valori di default se None.
+        Custom dimensions for the zones. Defaults to None, which initializes 
+        default ZoneConfig values.
 
-    Ritorna
+    Returns
     -------
     ZoneCheckResult
-        Contiene lo stato complessivo (CLEAR / WARNING / VIOLATION) e le liste
-        di veicoli rilevati in ciascuna zona.
+        Object containing the overall security status and lists of vehicles 
+        caught inside the warning and violation areas.
     """
     if config is None:
         config = ZoneConfig()
@@ -114,7 +143,6 @@ def check_right_forward_zones(
     ego_transform = ego_vehicle.get_transform()
     ego_id = ego_vehicle.id
 
-    # Recupera tutti i veicoli dalla scena (escluso l'ego)
     all_vehicles: List[carla.Actor] = [
         a for a in world.get_actors().filter("vehicle.*")
         if a.id != ego_id
@@ -127,7 +155,6 @@ def check_right_forward_zones(
         actor_loc = vehicle.get_location()
         lx, ly, lz = _world_to_local(ego_transform, actor_loc)
 
-        # Filtra per range verticale (evita veicoli su piani diversi)
         if abs(lz) > config.check_z_range:
             continue
 
@@ -150,10 +177,8 @@ def check_right_forward_zones(
         if in_violation:
             violation_vehicles.append(vehicle)
         elif in_warning:
-            # Nella warning solo se NON già in violation (evita duplicati)
             warning_vehicles.append(vehicle)
 
-    # Determina lo stato complessivo (priorità: violation > warning > clear)
     if violation_vehicles:
         status = ProximityStatus.VIOLATION
     elif warning_vehicles:
