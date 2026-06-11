@@ -5,22 +5,25 @@ import time
 import random
 import json
 
+
 def world_connect(name="localhost", port=2000, timeout=20.0, map_name=None):
+    """Connect to the CARLA world and return the world, spectator, and client objects."""
     client = carla.Client(name, port)
     client.set_timeout(timeout)
-    
+
     if map_name:
         print(f"Loading of {map_name} in progress...")
         world = client.load_world(map_name)
         print("Map loaded successfully!")
     else:
         world = client.get_world()
-        
+
     spectator = world.get_spectator()
     return world, spectator, client
 
 
 def move_spectator_to(transform, spectator, distance=7.0, z=3.0, pitch=-15.0):
+    """Move the spectator to a position behind and above the given transform."""
     back = transform.location - transform.get_forward_vector() * distance
     loc = carla.Location(back.x, back.y, back.z + z)
     rot = carla.Rotation(pitch=pitch, yaw=transform.rotation.yaw, roll=0.0)
@@ -28,6 +31,7 @@ def move_spectator_to(transform, spectator, distance=7.0, z=3.0, pitch=-15.0):
 
 
 def spawn_vehicle(world, spawn_index=0, vehicle_filter="vehicle.tesla.model3", autopilot=False):
+    """Spawn a vehicle at a random spawn point."""
     points = world.get_map().get_spawn_points()
     if not points:
         raise RuntimeError("No spawn points found")
@@ -123,6 +127,7 @@ def spawn_vehicle_ahead(world, ref_vehicle, distances=(20.0, 28.0, 36.0), same_l
 
 
 def spawn_camera(world, attach_to, transform, width=640, height=360, fov=95, tick=0.05):
+    """Spawn a camera sensor attached to the given actor."""
     bp = world.get_blueprint_library().find("sensor.camera.rgb")
     bp.set_attribute("image_size_x", str(width))
     bp.set_attribute("image_size_y", str(height))
@@ -132,6 +137,7 @@ def spawn_camera(world, attach_to, transform, width=640, height=360, fov=95, tic
 
 
 def spawn_lidar(world, attach_to, transform, channels=32, points_per_second=56000, rotation_frequency=20, range_m=35):
+    """Spawn a LiDAR sensor attached to the given actor."""
     bp = world.get_blueprint_library().find("sensor.lidar.ray_cast")
     bp.set_attribute("channels", str(channels))
     bp.set_attribute("points_per_second", str(points_per_second))
@@ -141,17 +147,20 @@ def spawn_lidar(world, attach_to, transform, channels=32, points_per_second=5600
 
 
 def image_to_bgr(image):
+    """Convert a CARLA image to a NumPy array in BGR format."""
     arr = np.frombuffer(image.raw_data, dtype=np.uint8)
     arr = np.reshape(arr, (image.height, image.width, 4))
     return arr[:, :, :3].copy()
 
 
 def lidar_to_numpy(measurement):
+    """Convert a CARLA LiDAR measurement to a NumPy array of shape (N, 4)."""
     pts = np.frombuffer(measurement.raw_data, dtype=np.float32)
     return np.reshape(pts, (-1, 4))
 
 
 def safe_destroy(actors):
+    """Safely destroy a list of CARLA actors, ignoring any that are already destroyed."""
     for a in actors:
         if a is not None:
             try:
@@ -164,6 +173,7 @@ def draw_on_screen(world, transform, content="O", color=carla.Color(0, 255, 0), 
     world.debug.draw_string(transform.location, content,
                             color=color, life_time=life_time)
 
+
 def spawn_random_vehicle_no_bike(world, spawn_index=0, autopilot=False):
     """Spawn a random vehicle excluding bicycles"""
     blueprint_library = world.get_blueprint_library()
@@ -171,18 +181,20 @@ def spawn_random_vehicle_no_bike(world, spawn_index=0, autopilot=False):
     vehicles = [bp for bp in all_vehicles if "bicycle" not in bp.id]
     if not vehicles:
         vehicles = all_vehicles
-    
+
     points = world.get_map().get_spawn_points()
     if not points:
         raise RuntimeError("No spawn points found")
-    
+
     for k in range(len(points)):
         vehicle_bp = random.choice(vehicles)
-        actor = world.try_spawn_actor(vehicle_bp, points[(spawn_index + k) % len(points)])
+        actor = world.try_spawn_actor(
+            vehicle_bp, points[(spawn_index + k) % len(points)])
         if actor is not None:
             actor.set_autopilot(autopilot)
             return actor
     raise RuntimeError("Could not spawn vehicle")
+
 
 def write_log(filename, frame_count, timestamp, control, scene_data, reverse):
     """Write frame data to JSON log file"""
@@ -197,7 +209,6 @@ def write_log(filename, frame_count, timestamp, control, scene_data, reverse):
         },
         'scene_data': {}
     }
-    # Converti scene_data (che può avere oggetti CARLA) a tipi JSON-serializzabili
     for key, value in scene_data.items():
         if hasattr(value, '__dict__'):
             log_entry['scene_data'][key] = str(value)
@@ -205,10 +216,11 @@ def write_log(filename, frame_count, timestamp, control, scene_data, reverse):
             log_entry['scene_data'][key] = value
         else:
             log_entry['scene_data'][key] = str(value)
-    
+
     with open(filename, 'a') as f:
         f.write(json.dumps(log_entry) + '\n')
-        
+
+
 def spawn_random_vehicle_no_bike_at(world, transform, vehicle_filter="vehicle.tesla.model3", autopilot=False):
     """Spawn a random non-bicycle vehicle at a fixed transform."""
     bps = world.get_blueprint_library().filter(vehicle_filter)
@@ -219,7 +231,8 @@ def spawn_random_vehicle_no_bike_at(world, transform, vehicle_filter="vehicle.te
 
     actor = world.try_spawn_actor(random.choice(vehicles), transform)
     if actor is None:
-        raise RuntimeError("Could not spawn vehicle at the requested transform")
+        raise RuntimeError(
+            "Could not spawn vehicle at the requested transform")
 
     actor.set_autopilot(autopilot)
     return actor

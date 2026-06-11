@@ -1,11 +1,9 @@
 """Tests for ViolationLogger buffering and file I/O."""
 import json
 from pathlib import Path
-import pytest
 from utils.violation_logger import ViolationLogger
 from models.state import State
 from models.transition import Transition
-from models.rule import Rule
 
 
 class DummyObject:
@@ -49,12 +47,13 @@ def test_violation_logger_autoflush_on_buffer_full(tmp_path, dummy_rule):
 def test_violation_logger_serializes_complex_objects(tmp_path, dummy_rule):
     """ViolationLogger converts objects to strings for serialization."""
     log_dir = tmp_path / "logs2"
-    vl = ViolationLogger(log_dir=str(log_dir), buffer_size=10)  # larger buffer to prevent immediate flush
-    
+    # larger buffer to prevent immediate flush
+    vl = ViolationLogger(log_dir=str(log_dir), buffer_size=10)
+
     idle = State("idle")
     warning = State("warning")
     transition = Transition("x > 10", idle, warning)
-    
+
     vl.log_violation(dummy_rule, transition, {"obj": DummyObject(42)})
 
     assert len(vl.buffer) == 1
@@ -66,11 +65,11 @@ def test_violation_logger_manual_flush(tmp_path, dummy_rule):
     """ViolationLogger flushes on explicit flush() call."""
     log_dir = tmp_path / "logs3"
     vl = ViolationLogger(log_dir=str(log_dir), buffer_size=10)
-    
+
     idle = State("idle")
     warning = State("warning")
     transition = Transition("x > 10", idle, warning)
-    
+
     vl.log_violation(dummy_rule, transition, {"k": "v"})
     assert len(vl.buffer) == 1
 
@@ -87,7 +86,8 @@ def test_violation_logger_flush_noop_on_empty(tmp_path):
     log_dir = tmp_path / "logs4"
     vl = ViolationLogger(log_dir=str(log_dir), buffer_size=5)
     vl.flush()  # Should not raise or create file
-    assert not Path(vl.log_file).exists(), "File should not be created on empty flush"
+    assert not Path(vl.log_file).exists(
+    ), "File should not be created on empty flush"
 
 
 def test_violation_logger_appends_to_existing_file(tmp_path, dummy_rule):

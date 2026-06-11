@@ -13,11 +13,13 @@ _TRANSITION_PATTERN = re.compile(
 
 
 def _parse_metadata_block(lines: list[str]) -> tuple[dict[str, Any], list[str]]:
-    """Extract YAML metadata block from ``lines``.
+    """
+    Extract YAML metadata block from ``lines``.
 
     Parameters
     -------
-    lines: list of stripped lines to inspect
+    lines: list[str]
+        list of stripped lines to inspect
 
     Returns
     -------
@@ -44,11 +46,13 @@ def _parse_metadata_block(lines: list[str]) -> tuple[dict[str, Any], list[str]]:
 
 
 def _parse_transition(line: str) -> tuple[str, str, str | None] | None:
-    """Parse a transition line.
+    """
+    Parse a transition line.
 
     Parameters
     -------
-    line: single diagram line
+    line: str
+        single diagram line
 
     Returns
     -------
@@ -64,26 +68,34 @@ def _parse_transition(line: str) -> tuple[str, str, str | None] | None:
 
 
 def _append_state(states: list[str], state: str) -> None:
-    """Append state to list if not present and not the start marker.
-    
+    """
+    Append state to list if not present and not the start marker.
+
     Parameters
     -------
-    states: list to append to
-    state: state name to append
+    states: list[str]
+        list to append to
+    state: str
+        state name to append
     """
     if state and state != '[*]' and state not in states:
         states.append(state)
 
 
 def _append_transition(transitions: list[dict[str, Any]], from_state: str, to_state: str, condition: str | None) -> None:
-    """Add or merge a transition into the transitions list.
+    """
+    Add or merge a transition into the transitions list.
 
     Parameters
     -------
-    transitions: list to append/merge into
-    from_state: source state
-    to_state: destination state
-    condition: optional condition string
+    transitions: list[dict[str, Any]]
+        list to append/merge into
+    from_state: str
+        source state
+    to_state: str
+        destination state
+    condition: str | None
+        optional condition string
     """
     if condition is None:
         transitions.append({'from': from_state, 'to': to_state})
@@ -105,24 +117,28 @@ def _append_transition(transitions: list[dict[str, Any]], from_state: str, to_st
 
     transitions.append(
         {'from': from_state, 'to': to_state, 'condition': condition})
-    
 
 
 def mermaid_to_yaml(mermaid_code: str, default_title: str | None = None) -> str:
-    """Convert Mermaid state diagram text to a YAML rule string.
+    """
+    Convert Mermaid state diagram text to a YAML rule string.
 
     Parameters
     -------
-    mermaid_code: Mermaid source text (may include metadata block)
-    default_title: title to use if metadata is absent
+    mermaid_code: str
+        Mermaid source text (may include metadata block)
+    default_title: str | None
+        title to use if metadata is absent
 
     Returns
     -------
-    YAML document as a string
+    str
+        YAML document as a string
 
     Raises
     -------
-    ValueError: if no 'stateDiagram-v2' header is found
+    ValueError
+        if no 'stateDiagram-v2' header is found
     """
 
     raw_lines = mermaid_code.splitlines()
@@ -176,17 +192,22 @@ def mermaid_to_yaml(mermaid_code: str, default_title: str | None = None) -> str:
 
 
 def mermaid_to_yaml_file(mermaid_code: str, file_path: str | Path, default_title: str | None = None) -> Path:
-    """Write converted YAML to file.
+    """
+    Write converted YAML to file.
 
     Parameters
     -------
-    mermaid_code: Mermaid source text
-    file_path: destination file path
-    default_title: optional default title
+    mermaid_code: str
+        Mermaid source text
+    file_path: str | Path
+        destination file path
+    default_title: str | None
+        optional default title
 
     Returns
     -------
-    Path pointing to the written file
+    Path
+        Path pointing to the written file
     """
     target_path = Path(file_path)
     target_path.parent.mkdir(parents=True, exist_ok=True)

@@ -1,6 +1,5 @@
 """Tests for StateMachine and state transition logic."""
 from controller.state_machine import StateMachine
-from models.state import State
 from carla_bindings import LazyDict
 
 
@@ -23,8 +22,10 @@ def test_state_machine_transition_on_true_condition(dummy_rule, idle_state, warn
 def test_state_machine_transition_back_on_false_condition(dummy_rule, idle_state, warning_state):
     """StateMachine transitions back when condition changes."""
     sm = StateMachine(dummy_rule)
-    sm.evaluate(LazyDict({"value": 11}))  # go to warning
-    new_state, transition, _ = sm.evaluate(LazyDict({"value": 9}))  # go back to idle
+    # go to warning
+    sm.evaluate(LazyDict({"value": 11}))
+    # go back to idle
+    new_state, transition, _ = sm.evaluate(LazyDict({"value": 9}))
     assert new_state == idle_state, "Should transition back to idle"
     assert sm._current_state == idle_state
     assert transition is not None, "Transition should have been executed"

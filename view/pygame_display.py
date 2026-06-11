@@ -27,13 +27,23 @@ class PygameDisplay:
         render_width: int = RENDER_WIDTH,
         render_height: int = RENDER_HEIGHT,
     ):
-        """Handles rendering the camera feed and processing user input for controlling the vehicle.
+        """
+        Handles rendering the camera feed and processing user input for controlling the vehicle.
 
-        Args:
-            width:         Initial window width in pixels (resizable at runtime).
-            height:        Initial window height in pixels (resizable at runtime).
-            render_width:  Camera sensor resolution width (fixed after start).
-            render_height: Camera sensor resolution height (fixed after start).
+        Parameters
+        -------
+        world: carla.World
+            The Carla world instance.
+        ego_vehicle: carla.Vehicle
+            The ego vehicle to control.
+        width: int
+            Initial window width in pixels (resizable at runtime).
+        height: int
+            Initial window height in pixels (resizable at runtime).
+        render_width: int
+            Camera sensor resolution width (fixed after start).
+        render_height: int
+            Camera sensor resolution height (fixed after start).
         """
         self.world = world
         self.ego_vehicle = ego_vehicle
@@ -46,8 +56,10 @@ class PygameDisplay:
         self._surface_lock = threading.Lock()
         self._camera = None
         self._camera_views = [
-            carla.Transform(carla.Location(x=-5.5, z=2.5), carla.Rotation(pitch=-10)),
-            carla.Transform(carla.Location(x=-1.8, z=5), carla.Rotation(pitch=-30)),
+            carla.Transform(carla.Location(x=-5.5, z=2.5),
+                            carla.Rotation(pitch=-10)),
+            carla.Transform(carla.Location(x=-1.8, z=5),
+                            carla.Rotation(pitch=-30)),
         ]
         self._camera_view_idx = 0
 
@@ -67,31 +79,33 @@ class PygameDisplay:
     def start(self):
         pygame.init()
         pygame.joystick.init()
-        self._screen = pygame.display.set_mode((self.width, self.height), pygame.RESIZABLE)
-        
-        # Force event polling to initialize XInput device
+        self._screen = pygame.display.set_mode(
+            (self.width, self.height), pygame.RESIZABLE)
+
         pygame.event.pump()
         if pygame.joystick.get_count() > 0:
             self._joystick = pygame.joystick.Joystick(0)
             self._joystick.init()
 
         bp = self.world.get_blueprint_library().find("sensor.camera.rgb")
-        # Camera resolution is fixed at sensor level; the rendered surface is
-        # scaled to the current window size inside _render().
+
         bp.set_attribute("image_size_x", str(self._render_width))
         bp.set_attribute("image_size_y", str(self._render_height))
         bp.set_attribute("fov", "90")
 
         cam_transform = self._camera_views[self._camera_view_idx]
-        self._camera = self.world.spawn_actor(bp, cam_transform, attach_to=self.ego_vehicle)
-        
+        self._camera = self.world.spawn_actor(
+            bp, cam_transform, attach_to=self.ego_vehicle)
+
         weak_self = weakref.ref(self)
-        self._camera.listen(lambda img: PygameDisplay._on_image(weak_self, img))
+        self._camera.listen(
+            lambda img: PygameDisplay._on_image(weak_self, img))
 
     @staticmethod
     def _on_image(weak_self, image):
         self = weak_self()
-        if not self: return
+        if not self:
+            return
         image.convert(carla.ColorConverter.Raw)
         array = np.frombuffer(image.raw_data, dtype=np.uint8)
         array = np.reshape(array, (image.height, image.width, 4))
@@ -99,22 +113,23 @@ class PygameDisplay:
         surface = pygame.surfarray.make_surface(array.swapaxes(0, 1))
         with self._surface_lock:
             self._surface = surface
-            
+
     def _handle_reverse(self):
-        '''Toggle reverse gear and update light state accordingly.
-        '''
+        '''Toggle reverse gear and update light state accordingly.'''
         self.reverse = not self.reverse
         if self.reverse:
             self.current_lights |= int(carla.VehicleLightState.Reverse)
         else:
             self.current_lights &= ~int(carla.VehicleLightState.Reverse)
-        self.ego_vehicle.set_light_state(carla.VehicleLightState(self.current_lights))
+        self.ego_vehicle.set_light_state(
+            carla.VehicleLightState(self.current_lights))
 
     def _toggle_camera_view(self):
         """Switch between top and low camera viewpoints."""
         if not self._camera:
             return
-        self._camera_view_idx = (self._camera_view_idx + 1) % len(self._camera_views)
+        self._camera_view_idx = (
+            self._camera_view_idx + 1) % len(self._camera_views)
         self._camera.set_transform(self._camera_views[self._camera_view_idx])
 
     def tick(self):
@@ -122,10 +137,9 @@ class PygameDisplay:
             if event.type == pygame.QUIT:
                 self.running = False
             elif event.type == pygame.VIDEORESIZE:
-                # On SDL2/pygame 2 the display is already resized automatically;
-                # we just update our bookkeeping so HUD and scaling stay correct.
                 self.width, self.height = event.size
-                self._screen = pygame.display.set_mode((self.width, self.height), pygame.RESIZABLE)
+                self._screen = pygame.display.set_mode(
+                    (self.width, self.height), pygame.RESIZABLE)
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r:
                     self._handle_reverse()
@@ -133,7 +147,6 @@ class PygameDisplay:
                     self._toggle_camera_view()
                 elif event.key in (pygame.K_q, pygame.K_ESCAPE):
                     self.running = False
-                # Arrow keys → blinker control (keyboard-only; joystick uses paddles)
                 elif event.key == pygame.K_LEFT and not self._joystick:
                     self._toggle_blinker(left=True)
                 elif event.key == pygame.K_RIGHT and not self._joystick:
@@ -151,7 +164,7 @@ class PygameDisplay:
     def _update_control(self):
         if self._joystick:
             steer = self._joystick.get_axis(0)
-            # Normalize triggers: -1.0 (released) to 1.0 (fully pressed) -> 0.0 to 1.0
+
             throttle = (self._joystick.get_axis(1) + 1.0) / 2.0
             brake = (self._joystick.get_axis(2) + 1.0) / 2.0
 
@@ -161,62 +174,60 @@ class PygameDisplay:
         else:
             keys = pygame.key.get_pressed()
             self._control.throttle = 1.0 if keys[pygame.K_w] else 0.0
-            self._control.steer = -0.5 if keys[pygame.K_a] else (0.5 if keys[pygame.K_d] else 0.0)
+            self._control.steer = - \
+                0.5 if keys[pygame.K_a] else (0.5 if keys[pygame.K_d] else 0.0)
             self._control.brake = 1.0 if keys[pygame.K_s] else 0.0
 
         self._control.reverse = self.reverse
 
     def _toggle_blinker(self, left: bool):
-        """Toggle left or right blinker, turning off the opposite one if active.
-        
-        Shared by keyboard (arrow keys) and joystick (paddle buttons) so the
-        logic lives in a single place.
-        """
+        """Toggle left or right blinker, turning off the opposite one if active."""
         if left:
-            own_flag   = int(carla.VehicleLightState.LeftBlinker)
+            own_flag = int(carla.VehicleLightState.LeftBlinker)
             other_flag = int(carla.VehicleLightState.RightBlinker)
         else:
-            own_flag   = int(carla.VehicleLightState.RightBlinker)
+            own_flag = int(carla.VehicleLightState.RightBlinker)
             other_flag = int(carla.VehicleLightState.LeftBlinker)
 
         if self.current_lights & own_flag:
-            # Already on → turn off
             self.current_lights &= ~own_flag
         else:
-            # Turn on and make sure the opposite is off
             self.current_lights &= ~other_flag
             self.current_lights |= own_flag
 
-        self.ego_vehicle.set_light_state(carla.VehicleLightState(self.current_lights))
+        self.ego_vehicle.set_light_state(
+            carla.VehicleLightState(self.current_lights))
 
     def _handle_joystick_button(self, button: int):
         """Handle joystick button presses for light control."""
         if button == 0:     # A → toggle reverse
-           self._handle_reverse()
+            self._handle_reverse()
         elif button == 1:   # B → hazard (both blinkers)
             self.current_lights ^= int(carla.VehicleLightState.LeftBlinker)
             self.current_lights ^= int(carla.VehicleLightState.RightBlinker)
-            self.ego_vehicle.set_light_state(carla.VehicleLightState(self.current_lights))
+            self.ego_vehicle.set_light_state(
+                carla.VehicleLightState(self.current_lights))
         elif button == 3:   # Y → toggle camera view
             self._toggle_camera_view()
         elif button == 4:   # paddle sx → left blinker
             self._toggle_blinker(left=True)
         elif button == 5:   # paddle dx → right blinker
             self._toggle_blinker(left=False)
-    
+
     def _render(self):
-        self._screen.fill((0, 0, 0))  # letterbox background
+        self._screen.fill((0, 0, 0))
 
         with self._surface_lock:
             if self._surface:
                 src_w, src_h = self._surface.get_size()
-                # Scale preserving aspect ratio (letterbox / pillarbox)
+
                 scale = min(self.width / src_w, self.height / src_h)
                 dst_w = int(src_w * scale)
                 dst_h = int(src_h * scale)
-                offset_x = (self.width  - dst_w) // 2
+                offset_x = (self.width - dst_w) // 2
                 offset_y = (self.height - dst_h) // 2
-                scaled_surface = pygame.transform.scale(self._surface, (dst_w, dst_h))
+                scaled_surface = pygame.transform.scale(
+                    self._surface, (dst_w, dst_h))
                 self._screen.blit(scaled_surface, (offset_x, offset_y))
 
         if self.hud_drawer:

@@ -10,10 +10,14 @@ class Rule:
         """
         Initialize a Rule.
 
-        Args:
-            name: The name of this rule
-            constants: The list of constants for this rule
-            transitions: The list of transitions for this rule
+        Parameters
+        -------
+        name: str
+            The name of this rule
+        constants: dict
+            The list of constants for this rule
+        transitions: List[Transition]
+            The list of transitions for this rule
         """
         self.name = name
         self._transitions = transitions
@@ -25,8 +29,11 @@ class Rule:
     @property
     def initial_state(self) -> State:
         """Get the initial state of this rule."""
-        return self._transitions[0].source if self._transitions else None
-    
+        if not self._transitions:
+            raise RuntimeError(
+                "Rule has no transitions, initial_state is undefined")
+        return self._transitions[0].source
+
     @property
     def constants(self) -> dict:
         """Get the constants for this rule."""

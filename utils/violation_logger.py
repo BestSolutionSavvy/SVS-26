@@ -9,9 +9,7 @@ from models.transition import Transition
 
 
 class ViolationLogger:
-    """
-    Handles logging of rule violations to a JSON file with buffering.
-    """
+    """Handles logging of rule violations to a JSON file with buffering."""
 
     def __init__(self, log_dir: str = "logs", buffer_size: int = 10):
         """
@@ -66,7 +64,6 @@ class ViolationLogger:
         """
         if not self.buffer:
             return
-
         existing = []
         if os.path.exists(self.log_file):
             with open(self.log_file, 'r') as f:
@@ -74,10 +71,7 @@ class ViolationLogger:
                     existing = json.load(f)
                 except (json.JSONDecodeError, ValueError):
                     existing = []
-
         existing.extend(self.buffer)
-
         with open(self.log_file, 'w') as f:
             json.dump(existing, f, indent=4)
-
         self.buffer.clear()

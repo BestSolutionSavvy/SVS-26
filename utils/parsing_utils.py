@@ -67,21 +67,4 @@ def parse_rule_files(folder_path: str) -> List[Rule]:
             if rule:
                 rules.append(rule)
     return rules
-    
 
-if __name__ == "__main__":
-    parsed_data = parse_rule_file('./admin/rules/lane_keeping.yaml')
-    print(parsed_data)
-    print(f"Initial state: {parsed_data.initial_state}")
-    def print_transitions(state, visited=None):
-        if visited is None:
-            visited = set()
-        if state.name in visited:
-            return
-        visited.add(state.name)
-        print(f"Transitions from {state.name}:")
-        for t in parsed_data.transitions_from(state):
-            print(f"  -> {t.target.name} (condition: {t.condition if t.condition else 'always'})")
-            print_transitions(t.target, visited)
-            
-    print_transitions(parsed_data.initial_state)

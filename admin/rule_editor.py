@@ -39,12 +39,15 @@ def open_info_dialog() -> None:
 
 
 def set_current_rule(rule_name: Optional[str], file_path: Optional[Path]) -> None:
-    """Set the currently active rule
-    
+    """
+    Set the currently active rule
+
     Parameters
     -------
-    rule_name: name of the current rule (without extension)
-    file_path: path to the rule file
+    rule_name: Optional[str]
+        name of the current rule (without extension)
+    file_path: Optional[Path]
+        path to the rule file
     """
     global current_rule_name, current_rule_path
     current_rule_name = rule_name
@@ -52,10 +55,13 @@ def set_current_rule(rule_name: Optional[str], file_path: Optional[Path]) -> Non
 
 
 def new_rule_template(rule_name: str) -> str:
-    """Generate a YAML template for a new rule with Mermaid state diagram
+    """
+    Generate a YAML template for a new rule with Mermaid state diagram
+
     Parameters
     -------
-    rule_name: name of the new rule (without extension)
+    rule_name: str
+        name of the new rule (without extension)
     """
     return f"""---
 title: {rule_name}
@@ -66,6 +72,7 @@ stateDiagram-v2
 	direction TB
 	[*] --> idle
 """
+
 
 def get_rules_list():
     """Get list of all .yaml files in rules directory"""
@@ -79,13 +86,11 @@ def render_rules_list() -> None:
     if rules_list_container is None:
         return
     rules_list_container.clear()
-
     rules_list = get_rules_list()
     with rules_list_container:
         if not rules_list:
             ui.label('No rules found').classes('text-sm text-gray-500')
             return
-
         for rule_name in rules_list:
             with ui.row().classes('w-full justify-between items-center mb-2 gap-2'):
                 ui.button(rule_name).on_click(lambda r=rule_name: handle_rule_click(
@@ -95,11 +100,13 @@ def render_rules_list() -> None:
 
 
 def delete_rule(rule_name: str) -> None:
-    """Delete a rule file
-    
+    """
+    Delete a rule file
+
     Parameters
     -------
-    rule_name: name of the rule to delete (without extension)
+    rule_name: str
+        name of the rule to delete (without extension)
     """
     file_path = rules_dir / f'{rule_name}.yaml'
     try:
@@ -113,6 +120,7 @@ def delete_rule(rule_name: str) -> None:
     except Exception as e:
         ui.notify(f'Error deleting rule: {e}')
 
+
 def open_new_rule_dialog() -> None:
     """Open the dialog for creating a new rule"""
     if new_rule_name_input is not None:
@@ -125,13 +133,11 @@ def create_new_rule() -> None:
     """Create a new rule from user input and open in editor"""
     if new_rule_name_input is None:
         return
-
     raw_name = (new_rule_name_input.value or '').strip()
     rule_name = re.sub(r'[^A-Za-z0-9_-]+', '_', raw_name).strip('_')
     if not rule_name:
         ui.notify('Please enter a rule name')
         return
-
     file_path = rules_dir / f'{rule_name}.yaml'
     rules_dir.mkdir(parents=True, exist_ok=True)
     set_current_rule(rule_name, file_path)
@@ -142,12 +148,12 @@ def create_new_rule() -> None:
     if new_rule_dialog is not None:
         new_rule_dialog.close()
 
+
 def save_current_rule() -> None:
     """Save the current rule to a YAML file"""
     if current_rule_path is None:
         ui.notify('Create a new rule first with +')
         return
-
     rules_dir.mkdir(parents=True, exist_ok=True)
     saved_path = mermaid_to_yaml_file(
         content['code'], current_rule_path, default_title=current_rule_name)
@@ -155,13 +161,14 @@ def save_current_rule() -> None:
     render_rules_list()
 
 
-def load_rule(filename):
-    """Load a YAML rule file and update the editor with Mermaid code
-    
+def load_rule(filename: str):
+    """
+    Load a YAML rule file and update the editor with Mermaid code
+
     Parameters
     -------
-    filename: name of the rule file to load
-    
+    filename: str
+        name of the rule file to load (with extension)
     """
     filepath = rules_dir / filename
     try:
@@ -174,13 +181,14 @@ def load_rule(filename):
         ui.notify(f'Error loading rule: {e}')
 
 
-def handle_rule_click(rule_name):
-    """Handle rule selection from the drawer
-    
+def handle_rule_click(rule_name: str):
+    """
+    Handle rule selection from the drawer
+
     Parameters
     -------
-    rule_name: name of the rule clicked
-    
+    rule_name: str
+        name of the rule clicked
     """
     load_rule(f'{rule_name}.yaml')
     close_rules_drawer()
@@ -230,7 +238,8 @@ with info_dialog:
                 ui.markdown(escaped_content).classes('overflow-auto max-h-96')
             except:
                 ui.label('Error loading data fields')
-            ui.button('Close', on_click=info_dialog.close).props('flat').classes('self-end')
+            ui.button('Close', on_click=info_dialog.close).props(
+                'flat').classes('self-end')
 
 
 with ui.row().classes('w-full no-wrap h-screen overflow-hidden'):

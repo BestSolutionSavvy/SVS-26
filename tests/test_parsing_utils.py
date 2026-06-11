@@ -1,6 +1,6 @@
 """Tests for YAML rule parsing."""
 import pytest
-from utils.parsing_utils import parse_rule_file, parse_yaml, parse_yaml_file
+from utils.parsing_utils import parse_rule_file, parse_yaml
 
 
 def test_parse_lane_keeping_rule_basic():
@@ -24,7 +24,8 @@ def test_parse_lane_keeping_rule_transitions_count():
     """Parsing produces expected number of transitions."""
     rule = parse_rule_file("./admin/rules/lane_keeping_continuous.yaml")
     # YAML has 5 transitions; parser ignores '[*]' entry, so we expect 4
-    assert len(rule._transitions) == 4, f"Expected 4 transitions, got {len(rule._transitions)}"
+    assert len(
+        rule._transitions) == 4, f"Expected 4 transitions, got {len(rule._transitions)}"
 
 
 def test_parse_lane_keeping_rule_transition_targets():
