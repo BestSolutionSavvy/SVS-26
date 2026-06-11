@@ -5,7 +5,7 @@
 - **safe_distance**: the minimum distance considered safe under current driving and weather conditions, computed as half the ego speed scaled by a weather multiplier.
 - **min_distance**: the absolute minimum distance threshold below which an intervention is required, computed as a quarter of the ego speed scaled by the same weather multiplier.
 - **in_intersection**: a boolean indicating whether the ego vehicle is currently inside an intersection.
-- **ego_can_enter_intersection**: a boolean indicating whether the ego vehicle is allowed to enter the intersection based on stop sign and traffic light conditions.
+- **ego_can_enter_intersection**: a boolean indicating whether the ego vehicle is allowed to enter the intersection based on traffic light conditions.
 - **other_can_enter_intersection**: a boolean indicating whether the vehicle detected in the right wedge is currently allowed to enter the intersection.
 - **right_wedge_far**: a boolean indicating whether there is a vehicle present in a wide area to the right of the ego vehicle.
 - **right_wedge_near**: a boolean indicating whether there is a vehicle present in a narrow area to the right of the ego vehicle.

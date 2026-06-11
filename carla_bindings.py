@@ -334,7 +334,7 @@ class DataBinder:
             return False
 
     def _can_enter_intersection(self, vehicle: carla.Actor) -> bool:
-        """checks if the given vehicle can enter the intersection: no stop sign or red light"""
+        """checks if the given vehicle can enter the intersection: no red light"""
         return not self.vehicle_has_red_light(vehicle)
 
     def compute_scene_data(self) -> LazyDict:
