@@ -1,7 +1,7 @@
 import carla
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from utils.lazy_dict import LazyDict
-from utils.right_of_way_utils import ZoneConfig, check_right_forward_zones, ProximityStatus
+from utils.right_of_way_utils import check_right_forward_zones
 
 
 class DataBinder:
@@ -77,6 +77,7 @@ class DataBinder:
             'left_edge_dist': left_edge_dist,
             'min_dist': min_dist,
         }
+
     def get_ego_distance_to_sign(self, sign_type: str = "stop") -> float:
         return self._get_distance_to_sign(self.ego_vehicle, sign_type=sign_type)
 
@@ -89,7 +90,8 @@ class DataBinder:
         float
             Distance in meters, or inf if no lead vehicle detected.
         """
-        ego_front, ego_back, ego_fwd, ego_loc = self._vehicle_endpoints(self.ego_vehicle)
+        ego_front, ego_back, ego_fwd, ego_loc = self._vehicle_endpoints(
+            self.ego_vehicle)
         ego_waypoint = self._safe_get_waypoint(ego_loc)
         ego_lane_id = ego_waypoint.lane_id if ego_waypoint is not None else None
         min_dist = float('inf')
@@ -158,7 +160,6 @@ class DataBinder:
         if info is None:
             return 'unknown'
         waypoint = info['waypoint']
-        # Determine which marking is closer
         if abs(info['right_edge_dist']) <= abs(info['left_edge_dist']):
             marking_type = waypoint.right_lane_marking.type
         else:
@@ -225,31 +226,6 @@ class DataBinder:
         if vehicle.get_traffic_light_state() == carla.TrafficLightState.Red:
             return True
         return False
-
-    def _get_ego_wedge_state(self):
-        """
-        Used to check if the right wedge of the ego vehicle is occupied by another vehicle, 
-        and if so whether it's a warning or violation based on proximity.
-        The wedge is defined as a rectangle extending forward and to the right of the ego vehicle, 
-        with configurable dimensions. A violation is flagged if another vehicle is detected 
-        within the near zone, and a warning if detected in the far zone but not the near zone.
-
-        Returns
-        -------
-        ZoneCheckResult
-            Contains the status (CLEAR, WARNING, VIOLATION) and lists of vehicles in each zone.
-        """
-        config = ZoneConfig(
-            warn_forward_offset=0.0,
-            warn_lateral_offset=0.5,
-            warn_length=25.0,
-            warn_width=6.0,
-            viol_forward_offset=0.0,
-            viol_lateral_offset=0.5,
-            viol_length=12.0,
-            viol_width=3.0,
-        )
-        return check_right_forward_zones(self.ego_vehicle, self.world, config)
 
     def _calculate_safe_distance(self) -> Dict[str, float]:
         """
@@ -337,6 +313,19 @@ class DataBinder:
         """checks if the given vehicle can enter the intersection: no red light"""
         return not self.vehicle_has_red_light(vehicle)
 
+    def _get_ego_wedge_state(self) -> Dict[str, List[carla.Actor]]:
+        """
+        Evaluates the right forward zones for the ego vehicle and returns the vehicles 
+        detected in those zones.
+
+        Returns
+        -------
+        Dict[str, List[carla.Actor]]
+            A dictionary mapping zone names ('far_zone', 'near_zone') to lists of vehicles 
+            detected within each zone.
+        """
+        return check_right_forward_zones(self.ego_vehicle, self.world)
+
     def compute_scene_data(self) -> LazyDict:
         """
         Returns
@@ -346,6 +335,7 @@ class DataBinder:
         """
         lane_marking_cache = {}
         safe_thresh_cache = {}
+        right_zone_cache = {}
 
         def lane_marking():
             if not lane_marking_cache:
@@ -356,15 +346,14 @@ class DataBinder:
             if not safe_thresh_cache:
                 safe_thresh_cache['v'] = self._calculate_safe_distance()
             return safe_thresh_cache['v']
-        right_zone_cache = {}
 
         def right_zone():
             if not right_zone_cache:
                 right_zone_cache['v'] = self._get_ego_wedge_state()
-                if right_zone_cache['v'].status == ProximityStatus.VIOLATION:
-                    self._wedge_vehicle = right_zone_cache['v'].violation_vehicles[0]
-                elif right_zone_cache['v'].status == ProximityStatus.WARNING:
-                    self._wedge_vehicle = right_zone_cache['v'].warning_vehicles[0]
+                if right_zone_cache['v']['near_zone']:
+                    self._wedge_vehicle = right_zone_cache['v']['near_zone'][0]
+                elif right_zone_cache['v']['far_zone']:
+                    self._wedge_vehicle = right_zone_cache['v']['far_zone'][0]
                 else:
                     self._wedge_vehicle = None
             return right_zone_cache['v']
@@ -379,8 +368,8 @@ class DataBinder:
             'in_intersection': self.ego_is_in_intersection,
             'ego_can_enter_intersection': self.ego_can_enter_intersection,
             'other_can_enter_intersection': self.other_can_enter_intersection,
-            'right_wedge_far': lambda: right_zone().status != ProximityStatus.CLEAR,
-            'right_wedge_near': lambda: len(right_zone().violation_vehicles) > 0,
+            'right_wedge_far': lambda: right_zone()['far_zone'],
+            'right_wedge_near': lambda: right_zone()['near_zone'],
             'min_line_distance': self.get_ego_min_line_distance,
             'line_continuous': lambda: lane_marking() == 'continuous',
             'line_dashed': lambda: lane_marking() == 'dashed',

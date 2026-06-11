@@ -1,14 +1,7 @@
 import carla
 import math
 from dataclasses import dataclass
-from typing import List, Tuple
-from enum import Enum
-
-
-class ProximityStatus(Enum):
-    CLEAR = "clear"
-    WARNING = "warning"
-    VIOLATION = "violation"
+from typing import Dict, List, Tuple
 
 
 @dataclass
@@ -19,24 +12,11 @@ class ZoneConfig:
     Defines rectangular areas in the ego vehicle's local frame 
     (Forward = +X, Right = +Y).
     """
-    warn_forward_offset: float = 0.0    
-    warn_lateral_offset: float = 0.5    
-    warn_length: float = 12.0          
-    warn_width: float = 4.0            
-
-    viol_forward_offset: float = 2.0    
-    viol_lateral_offset: float = 0.5    
-    viol_length: float = 6.0            
-    viol_width: float = 2.5            
-
-    check_z_range: float = 2.0          
-
-
-@dataclass
-class ZoneCheckResult:
-    status: ProximityStatus
-    warning_vehicles: List[carla.Actor]
-    violation_vehicles: List[carla.Actor]
+    forward_offset: float = 0.0
+    lateral_offset: float = 0.5
+    length: float = 25.0
+    width: float = 6.0
+    check_z_range: float = 2.0
 
 
 def _world_to_local(
@@ -67,8 +47,8 @@ def _world_to_local(
     cos_yaw = math.cos(yaw_rad)
     sin_yaw = math.sin(yaw_rad)
 
-    local_x = cos_yaw * dx + sin_yaw * dy   
-    local_y = -sin_yaw * dx + cos_yaw * dy  
+    local_x = cos_yaw * dx + sin_yaw * dy
+    local_y = -sin_yaw * dx + cos_yaw * dy
 
     return local_x, local_y, dz
 
@@ -112,14 +92,27 @@ def _point_in_rect(
 def check_right_forward_zones(
     ego_vehicle: carla.Actor,
     world: carla.World,
-    config: ZoneConfig = None,
-) -> ZoneCheckResult:
+    far_config: ZoneConfig = ZoneConfig(
+        forward_offset=0.0,
+        lateral_offset=0.5,
+        length=25.0,
+        width=6.0,
+        check_z_range=2.0
+    ),
+    near_config: ZoneConfig = ZoneConfig(
+        forward_offset=0.0,
+        lateral_offset=0.5,
+        length=12.0,
+        width=3.0,
+        check_z_range=2.0
+    ),
+) -> Dict[str, List[carla.Actor]]:
     """
     Evaluate surrounding vehicles to detect proximity threats in designated zones.
 
     Scans all active vehicles in the CARLA world, filters out the ego vehicle and 
-    objects outside the vertical range, and maps them to either the warning or 
-    violation zone based on their relative coordinates.
+    objects outside the vertical range, and maps them to either to the far or 
+    near zone based on their relative coordinates.
 
     Parameters
     ----------
@@ -133,13 +126,9 @@ def check_right_forward_zones(
 
     Returns
     -------
-    ZoneCheckResult
-        Object containing the overall security status and lists of vehicles 
-        caught inside the warning and violation areas.
+    Dict[str, List[carla.Actor]]
+        A dictionary mapping zone names to lists of vehicles detected within each zone.
     """
-    if config is None:
-        config = ZoneConfig()
-
     ego_transform = ego_vehicle.get_transform()
     ego_id = ego_vehicle.id
 
@@ -148,46 +137,39 @@ def check_right_forward_zones(
         if a.id != ego_id
     ]
 
-    warning_vehicles: List[carla.Actor] = []
-    violation_vehicles: List[carla.Actor] = []
+    far_vehicles: List[carla.Actor] = []
+    near_vehicles: List[carla.Actor] = []
 
     for vehicle in all_vehicles:
         actor_loc = vehicle.get_location()
         lx, ly, lz = _world_to_local(ego_transform, actor_loc)
+        in_far = False
+        in_near = False
 
-        if abs(lz) > config.check_z_range:
-            continue
-
-        in_violation = _point_in_rect(
-            lx, ly,
-            config.viol_forward_offset,
-            config.viol_lateral_offset,
-            config.viol_length,
-            config.viol_width,
-        )
-
-        in_warning = _point_in_rect(
-            lx, ly,
-            config.warn_forward_offset,
-            config.warn_lateral_offset,
-            config.warn_length,
-            config.warn_width,
-        )
-
-        if in_violation:
-            violation_vehicles.append(vehicle)
-        elif in_warning:
-            warning_vehicles.append(vehicle)
-
-    if violation_vehicles:
-        status = ProximityStatus.VIOLATION
-    elif warning_vehicles:
-        status = ProximityStatus.WARNING
-    else:
-        status = ProximityStatus.CLEAR
-
-    return ZoneCheckResult(
-        status=status,
-        warning_vehicles=warning_vehicles,
-        violation_vehicles=violation_vehicles,
-    )
+        if abs(lz) <= far_config.check_z_range:
+            in_far = _point_in_rect(
+                lx, ly,
+                far_config.forward_offset,
+                far_config.lateral_offset,
+                far_config.length,
+                far_config.width,
+            )
+        
+        if abs(lz) <= near_config.check_z_range:
+            in_near = _point_in_rect(
+                lx, ly,
+                near_config.forward_offset,
+                near_config.lateral_offset,
+                near_config.length,
+                near_config.width,
+            )
+        
+        if in_far:
+            far_vehicles.append(vehicle)
+        elif in_near:
+            near_vehicles.append(vehicle)
+            
+    return {
+        "far_zone": far_vehicles,
+        "near_zone": near_vehicles
+    }
