@@ -6,7 +6,7 @@ import random
 import json
 
 
-def world_connect(name="localhost", port=2000, timeout=20.0, map_name=None):
+def world_connect(name="localhost", port=2000, timeout=40.0, map_name=None):
     """Connect to the CARLA world and return the world, spectator, and client objects."""
     client = carla.Client(name, port)
     client.set_timeout(timeout)

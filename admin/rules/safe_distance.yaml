@@ -1,9 +1,5 @@
 metadata:
   title: safe_distance
-  constants:
-    speed_multiplier_safe: 0.5
-    speed_multiplier_min: 0.25
-    weather_factor: 1.3
 state_machine:
   direction: TB
   initial_state: idle

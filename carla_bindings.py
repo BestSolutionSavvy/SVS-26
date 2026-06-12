@@ -106,7 +106,7 @@ class DataBinder:
             if dot < 0:
                 continue
             v_waypoint = self._safe_get_waypoint(v_loc)
-            if ego_lane_id is not None and (v_waypoint is None or abs(v_waypoint.lane_id - ego_lane_id) > 1):
+            if ego_lane_id is not None and (v_waypoint is None or v_waypoint.lane_id != ego_lane_id):
                 continue
             _, v_back, _, _ = self._vehicle_endpoints(v)
             dist = ego_front.distance(v_back)
