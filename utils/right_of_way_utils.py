@@ -94,16 +94,16 @@ def check_right_forward_zones(
     world: carla.World,
     far_config: ZoneConfig = ZoneConfig(
         forward_offset=0.0,
-        lateral_offset=0.5,
-        length=25.0,
-        width=6.0,
+        lateral_offset=0.0,
+        length=30.0,
+        width=10.0,
         check_z_range=2.0
     ),
     near_config: ZoneConfig = ZoneConfig(
         forward_offset=0.0,
-        lateral_offset=0.5,
-        length=12.0,
-        width=3.0,
+        lateral_offset=0.0,
+        length=15.0,
+        width=5.0,
         check_z_range=2.0
     ),
 ) -> Dict[str, List[carla.Actor]]:
@@ -166,7 +166,7 @@ def check_right_forward_zones(
         
         if in_far:
             far_vehicles.append(vehicle)
-        elif in_near:
+        if in_near:
             near_vehicles.append(vehicle)
             
     return {
