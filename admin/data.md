@@ -7,9 +7,9 @@
 - **in_intersection**: a boolean indicating whether the ego vehicle is currently inside an intersection.
 - **ego_can_enter_intersection**: a boolean indicating whether the ego vehicle is allowed to enter the intersection based on traffic light conditions.
 - **other_can_enter_intersection**: a boolean indicating whether the vehicle detected in the right wedge is currently allowed to enter the intersection.
-- **right_wedge_far**: a boolean indicating whether there is a vehicle present in a wide area to the right of the ego vehicle.
-- **right_wedge_near**: a boolean indicating whether there is a vehicle present in a narrow area to the right of the ego vehicle.
-- **min_line_distance**: the minimum lateral distance from the ego vehicle's edge to the nearest lane marking. Returns -1.0 if the vehicle has crossed a line, and infinity inside junctions.
+- **right_wedge_far**: a boolean indicating whether there is a vehicle present in a wide area to the front-right of the ego vehicle.
+- **right_wedge_near**: a boolean indicating whether there is a vehicle present in a narrow area to the front-right of the ego vehicle.
+- **min_line_distance**: the minimum lateral distance from the ego vehicle's edge to the nearest lane marking. Returns -1 if the vehicle has crossed a line, and infinity inside junctions.
 - **line_continuous**: a boolean indicating whether the nearest lane marking is a solid line.
 - **line_dashed**: a boolean indicating whether the nearest lane marking is a dashed line.
 - **indicator**: the current state of the ego vehicle's turn indicator. Can be left, right, both, or None.
