@@ -3,7 +3,7 @@ metadata:
   constants:
     warning_threshold: 0.5
 state_machine:
-  direction: TB
+  direction: LR
   initial_state: idle
   states:
   - idle
