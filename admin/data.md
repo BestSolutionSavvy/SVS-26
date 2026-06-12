@@ -1,6 +1,6 @@
 - **ego_speed**: the current speed of the ego vehicle, computed as the magnitude of its velocity vector.
 - **ego_location**: the current position of the ego vehicle in the simulation world.
-- **distance_to_sign**: the signed forward distance from the ego vehicle's front bumper to the nearest road sign in the same lane. It is positive if the sign is ahead and negative if already passed. Returns infinity if no sign is found.
+- **distance_to_stop**: the signed forward distance from the ego vehicle's front bumper to the nearest stop sign in the same lane. It is positive if the sign is ahead and negative if already passed. Returns infinity if no sign is found.
 - **distance_to_lead**: the distance from the ego vehicle's front bumper to the rear bumper of the nearest vehicle ahead in the same lane. Returns infinity if no vehicle is found.
 - **safe_distance**: the minimum distance considered safe under current driving and weather conditions, computed as half the ego speed scaled by a weather multiplier.
 - **min_distance**: the absolute minimum distance threshold below which an intervention is required, computed as a quarter of the ego speed scaled by the same weather multiplier.

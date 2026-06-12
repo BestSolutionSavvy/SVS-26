@@ -17,19 +17,19 @@ state_machine:
     to: idle
   - from: idle
     to: warning
-    condition: distance_to_sign <= warning_threshold and distance_to_sign > stop_threshold
+    condition: distance_to_stop <= warning_threshold and distance_to_stop > stop_threshold
   - from: warning
     to: stopped
-    condition: ego_speed == 0.0 and distance_to_sign <= stop_threshold
+    condition: ego_speed == 0.0 and distance_to_stop <= stop_threshold
   - from: stopped
     to: idle
     condition: ego_speed >= stop_departure_speed
   - from: warning
     to: violation
-    condition: ego_speed > 0.0 and distance_to_sign <= 0.0
+    condition: ego_speed > 0.0 and distance_to_stop <= 0.0
   - from: warning
     to: idle
-    condition: distance_to_sign > warning_threshold
+    condition: distance_to_stop > warning_threshold
   - from: violation
     to: idle
-    condition: distance_to_sign > warning_threshold
+    condition: distance_to_stop > warning_threshold

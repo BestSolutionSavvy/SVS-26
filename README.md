@@ -130,15 +130,15 @@ state_machine:
   transitions:
     - from: idle
       to: warning
-      condition: "distance_to_sign <= 10 and distance_to_sign > 2"
+      condition: "distance_to_stop <= 10 and distance_to_stop > 2"
     
     - from: warning
       to: stopped
-      condition: "ego_speed == 0.0 and distance_to_sign <= 2"
+      condition: "ego_speed == 0.0 and distance_to_stop <= 2"
     
     - from: warning
       to: violation
-      condition: "ego_speed > 0.0 and distance_to_sign <= 0.0"
+      condition: "ego_speed > 0.0 and distance_to_stop <= 0.0"
     
     - from: stopped
       to: idle

@@ -78,8 +78,8 @@ class DataBinder:
             'min_dist': min_dist,
         }
 
-    def get_ego_distance_to_sign(self, sign_type: str = "stop") -> float:
-        return self._get_distance_to_sign(self.ego_vehicle, sign_type=sign_type)
+    def get_ego_distance_to_stop(self) -> float:
+        return self._get_distance_to_sign(self.ego_vehicle, sign_type="stop")
 
     def get_ego_distance_to_lead(self) -> float:
         """
@@ -361,7 +361,7 @@ class DataBinder:
         resolvers = {
             'ego_speed': self.get_ego_speed,
             'ego_location': self.get_ego_location,
-            'distance_to_sign': self.get_ego_distance_to_sign,
+            'distance_to_stop': self.get_ego_distance_to_stop,
             'distance_to_lead': self.get_ego_distance_to_lead,
             'safe_distance': lambda: safe_thresh()['threshold_safe'],
             'min_distance': lambda: safe_thresh()['threshold_min'],
