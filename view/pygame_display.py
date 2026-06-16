@@ -165,10 +165,10 @@ class PygameDisplay:
         if self._joystick:
             steer = self._joystick.get_axis(0)
 
-            throttle = (self._joystick.get_axis(3) + 1.0) / 2.0
-            brake = (self._joystick.get_axis(4) + 1.0) / 2.0
+            throttle = (self._joystick.get_axis(1) + 1.0) / 2.0
+            brake = (self._joystick.get_axis(2) + 1.0) / 2.0
 
-            self._control.steer = steer if abs(steer) > 0.05 else 0.0
+            self._control.steer = steer**3 if abs(steer) > 0.05 else 0.0
             self._control.throttle = throttle if throttle > 0.05 else 0.0
             self._control.brake = brake if brake > 0.05 else 0.0
         else:
@@ -202,16 +202,16 @@ class PygameDisplay:
         """Handle joystick button presses for light control."""
         if button == 0:     # A → toggle reverse
             self._handle_reverse()
-        elif button == 1:   # X → hazard (both blinkers)
+        elif button == 1:   # B → hazard (both blinkers)
             self.current_lights ^= int(carla.VehicleLightState.LeftBlinker)
             self.current_lights ^= int(carla.VehicleLightState.RightBlinker)
             self.ego_vehicle.set_light_state(
                 carla.VehicleLightState(self.current_lights))
         elif button == 3:   # Y → toggle camera view
             self._toggle_camera_view()
-        elif button == 5:   # paddle sx → left blinker
+        elif button == 4:   # paddle sx → left blinker
             self._toggle_blinker(left=True)
-        elif button == 4:   # paddle dx → right blinker
+        elif button == 5:   # paddle dx → right blinker
             self._toggle_blinker(left=False)
 
     def _render(self):

@@ -276,7 +276,6 @@ class DataBinder:
         except:
             return float('inf')
         waypoint = self._safe_get_waypoint(loc)
-        lane_id = waypoint.lane_id if waypoint is not None else None
         min_signed_dist = float('inf')
         best_sign = None
         for sign in signs:
@@ -285,13 +284,24 @@ class DataBinder:
             fwd_proj = rel_vec.x * fwd.x + rel_vec.y * fwd.y
             if fwd_proj < -5.0:
                 continue
+            sign_fwd = sign.get_transform().get_forward_vector()
+            if abs(fwd.x * sign_fwd.x + fwd.y * sign_fwd.y) < 0.707:
+                continue
             try:
-                sign_waypoint = self.map_obj.get_waypoint(
-                    sign_loc, project_to_road=True)
-                if lane_id is not None and sign_waypoint.lane_id != lane_id:
+                sign_waypoint = self.map_obj.get_waypoint(sign_loc, project_to_road=True)
+                if sign_waypoint is None:
                     continue
+                if waypoint is not None:
+                    if sign_waypoint.road_id == waypoint.road_id:
+                        if sign_waypoint.lane_id * waypoint.lane_id <= 0:
+                            continue
+                    else:
+                        right_vec = waypoint.transform.get_right_vector()
+                        lateral_dist = abs(rel_vec.x * right_vec.x + rel_vec.y * right_vec.y)
+                        if lateral_dist > 6.0:
+                            continue
             except:
-                pass
+                continue
             distance = front.distance(sign_loc)
             signed_dist = distance if fwd_proj >= 0 else -distance
             if abs(signed_dist) < abs(min_signed_dist):
